@@ -17,6 +17,7 @@ Next.js 16 App Router (Turbopack), TypeScript, Tailwind 4, MapLibre GL 6 (OpenFr
 - src/components/WorldMap.tsx: EarthRanger-style shell (44px top bar with live dot, 70px icon rail: Now/Feed/About, 24rem panel, floating time slider); SpeciesPanel.tsx: hero image + charts (inline SVG, single series each); AboutPanel.tsx: credits
 - src/lib/media.ts + /api/v1/media: cached species image/blurb (Wikipedia, iNat CC fallback) in species_media
 - /api/v1/status: live dot + totals
+- src/lib/mapIcons.ts + public/icons/er: EarthRanger silhouettes (Apache 2.0) drawn per taxon group (species_media.iconic from iNat) x source colour, symbol layer from zoom 3.5
 - drizzle/*.sql: plain SQL migrations applied in order by scripts/migrate.mts
 - public/maplibre/: worker files copied by postinstall (gitignored); MapLibre 6 worker needs them under Turbopack
 

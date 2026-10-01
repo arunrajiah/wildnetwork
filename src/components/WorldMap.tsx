@@ -1,8 +1,9 @@
 "use client";
 
-import { AttributionControl, Map as MLMap, NavigationControl, Popup, setWorkerUrl, type GeoJSONSource } from "maplibre-gl";
+import { AttributionControl, Map as MLMap, NavigationControl, Popup, setWorkerUrl, type GeoJSONSource, type MapLayerMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ICON_IMAGE, registerIcons } from "@/lib/mapIcons";
 import AboutPanel from "./AboutPanel";
 import SpeciesPanel, { type SpeciesDetail } from "./SpeciesPanel";
 
@@ -72,7 +73,14 @@ export default function WorldMap() {
         id: "events", type: "circle", source: "events",
         paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 2.5, 8, 6], "circle-color": SOURCE_COLOR as never, "circle-opacity": 0.95, "circle-stroke-width": 0.5, "circle-stroke-color": "#020617" },
       });
-      map.on("click", "events", (e) => {
+      registerIcons(map).then(() => {
+        if (map.getLayer("events-icons")) return;
+        map.addLayer({
+          id: "events-icons", type: "symbol", source: "events", minzoom: 3.5, filter: ["!=", ["get", "group"], "Unknown"],
+          layout: { "icon-image": ICON_IMAGE as never, "icon-size": ["interpolate", ["linear"], ["zoom"], 3.5, 0.45, 8, 0.8], "icon-padding": 1 },
+        });
+      }).catch((err) => console.error("icon load failed", err));
+      const showPopup = (e: MapLayerMouseEvent) => {
         const f = e.features?.[0];
         if (!f) return;
         const p = f.properties as Record<string, string>;
@@ -83,9 +91,12 @@ export default function WorldMap() {
           .setLngLat((f.geometry as GeoJSON.Point).coordinates as [number, number])
           .setHTML(`<div style="font:13px system-ui;color:#e2e8f0"><b>${p.common ?? p.sci}</b><br/><i>${p.sci ?? ""}</i><br/>${new Date(p.t).toLocaleString()}<br/>confidence ${Number(p.conf).toFixed(2)} · ${p.source}${media}</div>`)
           .addTo(map);
-      });
-      map.on("mouseenter", "events", () => (map.getCanvas().style.cursor = "pointer"));
-      map.on("mouseleave", "events", () => (map.getCanvas().style.cursor = ""));
+      };
+      for (const layer of ["events", "events-icons"]) {
+        map.on("click", layer, showPopup);
+        map.on("mouseenter", layer, () => (map.getCanvas().style.cursor = "pointer"));
+        map.on("mouseleave", layer, () => (map.getCanvas().style.cursor = ""));
+      }
       setReady(true);
     });
     mapRef.current = map;

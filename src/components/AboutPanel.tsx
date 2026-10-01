@@ -37,7 +37,7 @@ export default function AboutPanel() {
         <p>
           <Link href="https://maplibre.org">MapLibre GL</Link>, <Link href="https://openfreemap.org">OpenFreeMap</Link> tiles from{" "}
           <Link href="https://openmaptiles.org">OpenMapTiles</Link> and <Link href="https://www.openstreetmap.org/copyright">OpenStreetMap</Link> contributors,{" "}
-          <Link href="https://postgis.net">PostGIS</Link>, Next.js. Interface patterns inspired by{" "}
+          <Link href="https://postgis.net">PostGIS</Link>, Next.js. Interface patterns and map silhouettes from{" "}
           <Link href="https://www.earthranger.com">EarthRanger</Link> (Apache 2.0), the conservation platform from the Allen Institute for AI.
         </p>
       </section>

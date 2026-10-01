@@ -53,13 +53,15 @@ export async function GET(req: Request) {
   const hasBbox = bbox?.length === 4 && bbox.every((n) => Number.isFinite(n));
 
   const rows = await sql`
-    SELECT event_id, event_start, scientific_name, vernacular_name, confidence,
-           latitude, longitude, source_system, deployment_id, media_url, media_type, review_status
-    FROM events
+    SELECT e.event_id, e.event_start, e.scientific_name, e.vernacular_name, e.confidence,
+           e.latitude, e.longitude, e.source_system, e.deployment_id, e.media_url, e.media_type, e.review_status,
+           CASE WHEN e.media_type IN ('image', 'video') AND e.source_system NOT IN ('inaturalist') THEN 'camera'
+                ELSE COALESCE(NULLIF(m.iconic, 'Unknown'), CASE WHEN e.source_system = 'birdweather' THEN 'Aves' END, 'Unknown') END AS grp
+    FROM events e LEFT JOIN species_media m ON m.scientific_name = e.scientific_name
     WHERE event_start >= ${from} AND event_start <= ${to}
       AND confidence >= ${minConf}
       AND review_status <> 'rejected'
-      ${species ? sql`AND scientific_name = ${species}` : sql``}
+      ${species ? sql`AND e.scientific_name = ${species}` : sql``}
       ${source ? sql`AND source_system = ${source}` : sql``}
       ${hasBbox ? sql`AND geom && ST_MakeEnvelope(${bbox![0]}, ${bbox![1]}, ${bbox![2]}, ${bbox![3]}, 4326)::geography` : sql``}
     ORDER BY event_start DESC
@@ -82,6 +84,7 @@ export async function GET(req: Request) {
         media: r.media_url,
         mediaType: r.media_type,
         review: r.review_status,
+        group: r.grp,
       },
     })),
   });
