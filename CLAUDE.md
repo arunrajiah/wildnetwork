@@ -16,7 +16,9 @@ Next.js 16 App Router (Turbopack), TypeScript, Tailwind 4, MapLibre GL 6 (OpenFr
 - src/app/api/cron/rollup: hourly refresh of today+yesterday rollups
 - src/components/WorldMap.tsx: EarthRanger-style shell (44px top bar with live dot, 70px icon rail: Now/Feed/About, 24rem panel, floating time slider); SpeciesPanel.tsx: hero image + charts (inline SVG, single series each); AboutPanel.tsx: credits
 - src/lib/media.ts + /api/v1/media: cached species image/blurb (Wikipedia, iNat CC fallback) in species_media
-- /api/v1/status: live dot + totals
+- /api/v1/status: live dot + totals; also triggers a background pull via after() when data is >4 min old (lock row '_visit_lock' in pull_state)
+- species_weekly + /api/v1/species/[name]/movement: weekly frames for a year; map slider switches to Movement mode when a species is selected (week-cells layer + per-continent centroid track). Backfill: pnpm backfill:weekly [weeks] (slow, ~2 min per week)
+- Logo: public/logo.svg = src/app/icon.svg (favicon) + apple-icon.png
 - src/lib/mapIcons.ts + public/icons/er: EarthRanger silhouettes (Apache 2.0) drawn per taxon group (species_media.iconic from iNat) x source colour, symbol layer from zoom 3.5
 - drizzle/*.sql: plain SQL migrations applied in order by scripts/migrate.mts
 - public/maplibre/: worker files copied by postinstall (gitignored); MapLibre 6 worker needs them under Turbopack

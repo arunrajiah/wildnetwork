@@ -1,3 +1,5 @@
+<p align="center"><img src="public/logo.svg" width="96" alt="WildNetwork logo" /></p>
+
 # WildNetwork
 
 A live world map of bird and animal detections, aggregated from any network or device.

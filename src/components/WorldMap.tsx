@@ -18,6 +18,7 @@ interface Insights {
   arrivals: { scientificName: string; vernacularName: string | null; cellLat: number; cellLon: number; n: number }[];
 }
 
+interface Movement { scientificName: string; frames: { week: string; total: number; cells: [number, number, number][]; centroids: { region: string; n: number; lat: number; lon: number }[] }[] }
 interface Status { live: boolean; lastPullAt: string | null; events1h: number; sensors: number; detections: number; species: number }
 
 const EMPTY: FC = { type: "FeatureCollection", features: [] };
@@ -44,6 +45,9 @@ export default function WorldMap() {
   const [thumbs, setThumbs] = useState<Record<string, string | null>>({});
   const [tab, setTab] = useState<"now" | "feed" | "about" | null>("now");
   const [status, setStatus] = useState<Status | null>(null);
+  const [movement, setMovement] = useState<Movement | null>(null);
+  const [frame, setFrame] = useState<number | null>(null); // index into movement.frames; null = live view
+  const [mvPlaying, setMvPlaying] = useState(false);
 
   const thumbsRef = useRef<Record<string, string | null>>({});
   const windowStart = useMemo(() => fetchedAt - hours * 3600_000, [fetchedAt, hours]);
@@ -64,6 +68,14 @@ export default function WorldMap() {
           "fill-opacity": ["interpolate", ["linear"], ["get", "weight"], 0, 0.08, 1, 0.45],
         },
       });
+      map.addSource("week-cells", { type: "geojson", data: EMPTY });
+      map.addSource("track", { type: "geojson", data: EMPTY });
+      map.addLayer({
+        id: "week-cells", type: "fill", source: "week-cells",
+        paint: { "fill-color": "#22d3ee", "fill-opacity": ["interpolate", ["linear"], ["get", "share"], 0, 0.04, 1, 0.7], "fill-outline-color": "rgba(34,211,238,0.25)" },
+      });
+      map.addLayer({ id: "track-line", type: "line", source: "track", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#f8fafc", "line-width": 3, "line-opacity": 0.75 } });
+      map.addLayer({ id: "track-head", type: "circle", source: "track", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 6, "circle-color": "#f8fafc", "circle-stroke-width": 2, "circle-stroke-color": "#020617" } });
       map.addLayer({ id: "deployments", type: "circle", source: "deployments", paint: { "circle-radius": 2, "circle-color": "#475569", "circle-opacity": 0.7 } });
       map.addLayer({
         id: "events-glow", type: "circle", source: "events",
@@ -157,9 +169,48 @@ export default function WorldMap() {
     return () => { cancelled = true; };
   }, [species]);
 
+  // Weekly movement frames for the selected species (a year of history).
+  useEffect(() => {
+    if (!species) return;
+    let cancelled = false;
+    fetch(`/api/v1/species/${encodeURIComponent(species)}/movement`).then((r) => r.json()).then((d: Movement) => { if (!cancelled) setMovement(d); });
+    return () => { cancelled = true; };
+  }, [species]);
+
+  const frames = useMemo(() => (species && movement?.scientificName === species ? movement.frames : []), [species, movement]);
+  const activeFrame = species && frame !== null && frames[frame] ? frames[frame] : null;
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
+    const weekSrc = map.getSource("week-cells") as GeoJSONSource, trackSrc = map.getSource("track") as GeoJSONSource;
+    if (activeFrame) {
+      const max = Math.max(1, ...activeFrame.cells.map((c) => c[2]));
+      weekSrc?.setData({ type: "FeatureCollection", features: activeFrame.cells.map(([lat, lon, n]) => ({
+        type: "Feature", properties: { share: Math.sqrt(n / max) },
+        geometry: { type: "Polygon", coordinates: [[[lon, lat], [lon + 5, lat], [lon + 5, lat + 5], [lon, lat + 5], [lon, lat]]] },
+      })) });
+      // One centroid track per continent that holds at least 10% of the year's detections.
+      const yearTotal = frames.reduce((a, f) => a + f.total, 0);
+      const byRegion = new Map<string, { n: number; pts: [number, number][] }>();
+      frames.slice(0, frame! + 1).forEach((f) => f.centroids.forEach((c) => {
+        const g = byRegion.get(c.region) ?? { n: 0, pts: [] };
+        g.pts.push([c.lon, c.lat]); byRegion.set(c.region, g);
+      }));
+      frames.forEach((f) => f.centroids.forEach((c) => { const g = byRegion.get(c.region); if (g) g.n += c.n; }));
+      const feats: GeoJSON.Feature[] = [];
+      for (const g of byRegion.values()) {
+        if (g.n < yearTotal * 0.1) continue;
+        if (g.pts.length > 1) feats.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: g.pts } });
+        feats.push({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: g.pts[g.pts.length - 1] } });
+      }
+      trackSrc?.setData({ type: "FeatureCollection", features: feats });
+      (map.getSource("cells") as GeoJSONSource)?.setData(EMPTY);
+      (map.getSource("events") as GeoJSONSource)?.setData(EMPTY);
+      (map.getSource("deployments") as GeoJSONSource)?.setData(deployments);
+      return;
+    }
+    weekSrc?.setData(EMPTY); trackSrc?.setData(EMPTY);
     (map.getSource("cells") as GeoJSONSource)?.setData(species ? cells : EMPTY);
     (map.getSource("deployments") as GeoJSONSource)?.setData(deployments);
     let fc = events;
@@ -169,7 +220,7 @@ export default function WorldMap() {
       fc = { ...events, features: events.features.filter((f) => { const t = Date.parse(String(f.properties.t)); return t <= cutoff && t > cutoff - trail; }) };
     }
     (map.getSource("events") as GeoJSONSource)?.setData(fc);
-  }, [events, deployments, cells, species, playhead, ready, windowStart, hours]);
+  }, [events, deployments, cells, species, playhead, ready, windowStart, hours, activeFrame, frames, frame]);
 
   useEffect(() => {
     if (!playing) return;
@@ -178,8 +229,14 @@ export default function WorldMap() {
     return () => clearInterval(id);
   }, [playing, hours]);
 
+  useEffect(() => {
+    if (!mvPlaying || frames.length === 0) return;
+    const id = setInterval(() => setFrame((f) => ((f ?? -1) + 1) % frames.length), 450);
+    return () => clearInterval(id);
+  }, [mvPlaying, frames.length]);
+
   const total = hours * 3600_000;
-  const pick = (name: string) => { setSpecies(name); setPlayhead(null); setPlaying(false); setTab("now"); };
+  const pick = (name: string) => { setSpecies(name); setPlayhead(null); setPlaying(false); setFrame(null); setMvPlaying(false); setTab("now"); };
   const flyTo = (f: GeoJSON.Feature<GeoJSON.Geometry, Record<string, unknown>>) => {
     const c = (f.geometry as GeoJSON.Point).coordinates as [number, number];
     mapRef.current?.flyTo({ center: c, zoom: Math.max(mapRef.current.getZoom(), 6), duration: 900 });
@@ -187,11 +244,13 @@ export default function WorldMap() {
   const panelOpen = tab !== null || species !== null;
 
   return (
-    <div className="relative h-screen w-screen bg-slate-950 text-slate-100 font-sans overflow-hidden">
+    <div className="fixed inset-0 bg-slate-950 text-slate-100 font-sans overflow-clip">
       <div className="absolute inset-0"><div ref={containerRef} className="h-full w-full" /></div>
 
       {/* Top bar */}
       <header className="absolute top-0 inset-x-0 h-11 bg-black/80 backdrop-blur-xl border-b border-white/10 flex items-center px-3 gap-3 z-20">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.svg" alt="" className="w-6 h-6 rounded-md" />
         <span className="font-semibold tracking-tight">WildNetwork</span>
         <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
           <span className={`inline-block w-2 h-2 rounded-full ${status?.live ? "bg-[#7fd320]" : "bg-[#d0031b]"}`} />
@@ -290,6 +349,21 @@ export default function WorldMap() {
 
       {/* Time slider */}
       <div className={`absolute right-6 bottom-6 ${panelOpen ? "left-[30rem]" : "left-24"} h-[3.75rem] rounded-lg bg-black/70 backdrop-blur-xl border border-white/10 px-4 flex items-center gap-3 z-10 transition-[left]`}>
+        {species ? (
+          <>
+            <span className="text-[11px] uppercase tracking-wider text-slate-400 shrink-0 whitespace-nowrap">{activeFrame ? new Date(activeFrame.week).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" }) : "Movement"}</span>
+            <button disabled={frames.length === 0} onClick={() => { setMvPlaying((p) => !p); if (frame === null) setFrame(0); }} className="rounded bg-[#006cd9] hover:bg-[#2b84e6] disabled:opacity-40 text-sm px-3 py-1 font-medium whitespace-nowrap shrink-0">
+              {mvPlaying ? "Pause" : "Play year"}
+            </button>
+            <input type="range" min={0} max={Math.max(0, frames.length - 1)} aria-label="Week" step={1} value={frame ?? Math.max(0, frames.length - 1)} disabled={frames.length === 0}
+              onChange={(e) => { setMvPlaying(false); setFrame(Number(e.target.value)); }} className="flex-1 min-w-0 accent-[#006cd9]" />
+            <button onClick={() => { setMvPlaying(false); setFrame(null); }} className="text-xs text-slate-400 hover:text-white">Live</button>
+            <span className="text-xs text-slate-300 tabular-nums whitespace-nowrap text-right hidden lg:inline">
+              {frames.length === 0 ? "No weekly history yet" : activeFrame ? `Week of ${new Date(activeFrame.week).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })} · ${activeFrame.total.toLocaleString()}` : `${frames.length} weeks available`}
+            </span>
+          </>
+        ) : (
+          <>
         <div className="flex gap-1">
           {HOURS.map((h) => (
             <button key={h} onClick={() => { setHours(h); setPlayhead(null); setPlaying(false); }}
@@ -307,6 +381,8 @@ export default function WorldMap() {
         <span className="text-xs text-slate-300 tabular-nums w-40 text-right hidden sm:inline">
           {playhead === null ? `${events.features.length.toLocaleString()} events` : new Date(windowStart + playhead).toLocaleString()}
         </span>
+          </>
+        )}
       </div>
     </div>
   );

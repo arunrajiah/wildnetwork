@@ -30,8 +30,17 @@ export async function birdweatherCells(): Promise<{ lat: number; lon: number }[]
 interface TopSpecies { count: number; breakdown: { almostCertain: number; veryLikely: number } | null; species: { scientificName: string; commonName: string } }
 
 /** Rollup one BirdWeather cell for one day via topSpecies aggregate (no raw events). */
-export async function rollupBirdweatherCellDay(cell: { lat: number; lon: number }, day: string): Promise<number> {
-  const next = new Date(Date.parse(day) + 86400_000).toISOString().slice(0, 10);
+export function rollupBirdweatherCellDay(cell: { lat: number; lon: number }, day: string): Promise<number> {
+  return rollupBirdweatherCell(cell, day, 1);
+}
+
+/** Same, for the 7 days starting at `week` (a Monday), into species_weekly. */
+export function rollupBirdweatherCellWeek(cell: { lat: number; lon: number }, week: string): Promise<number> {
+  return rollupBirdweatherCell(cell, week, 7);
+}
+
+async function rollupBirdweatherCell(cell: { lat: number; lon: number }, day: string, spanDays: 1 | 7): Promise<number> {
+  const next = new Date(Date.parse(day) + spanDays * 86400_000).toISOString().slice(0, 10);
   const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -58,6 +67,15 @@ export async function rollupBirdweatherCellDay(cell: { lat: number; lon: number 
     sites: null,
   }));
   if (rows.length === 0) return 0;
+  if (spanDays === 7) {
+    const weekly = rows.map((r) => ({ week: r.day, source_system: r.source_system, scientific_name: r.scientific_name, vernacular_name: r.vernacular_name, cell_lat: r.cell_lat, cell_lon: r.cell_lon, count: r.count, high_conf_count: r.high_conf_count }));
+    await sql`
+      INSERT INTO species_weekly ${sql(weekly)}
+      ON CONFLICT (week, source_system, scientific_name, cell_lat, cell_lon) DO UPDATE SET
+        count = EXCLUDED.count, high_conf_count = EXCLUDED.high_conf_count, vernacular_name = EXCLUDED.vernacular_name
+    `;
+    return rows.length;
+  }
   await sql`
     INSERT INTO species_daily ${sql(rows)}
     ON CONFLICT (day, source_system, scientific_name, cell_lat, cell_lon) DO UPDATE SET
