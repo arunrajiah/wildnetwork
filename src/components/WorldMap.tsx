@@ -3,6 +3,7 @@
 import { AttributionControl, Map as MLMap, NavigationControl, Popup, setWorkerUrl, type GeoJSONSource } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AboutPanel from "./AboutPanel";
 import SpeciesPanel, { type SpeciesDetail } from "./SpeciesPanel";
 
 setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
@@ -15,6 +16,8 @@ interface Insights {
   drift: { scientificName: string; vernacularName: string | null; region: string; driftDeg: number; latNow: number; n: number }[];
   arrivals: { scientificName: string; vernacularName: string | null; cellLat: number; cellLon: number; n: number }[];
 }
+
+interface Status { live: boolean; lastPullAt: string | null; events1h: number; sensors: number; detections: number; species: number }
 
 const EMPTY: FC = { type: "FeatureCollection", features: [] };
 const STYLE = "https://tiles.openfreemap.org/styles/dark";
@@ -38,6 +41,8 @@ export default function WorldMap() {
   const [playhead, setPlayhead] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const [thumbs, setThumbs] = useState<Record<string, string | null>>({});
+  const [tab, setTab] = useState<"now" | "feed" | "about" | null>("now");
+  const [status, setStatus] = useState<Status | null>(null);
 
   const thumbsRef = useRef<Record<string, string | null>>({});
   const windowStart = useMemo(() => fetchedAt - hours * 3600_000, [fetchedAt, hours]);
@@ -92,15 +97,16 @@ export default function WorldMap() {
     const from = new Date(Date.now() - hours * 3600_000).toISOString();
     const u = new URLSearchParams({ from, limit: "20000" });
     if (species) u.set("species", species);
-    const [ev, dep, sp, ins] = await Promise.all([
+    const [ev, dep, sp, ins, st] = await Promise.all([
       fetch(`/api/v1/events?${u}`).then((r) => r.json() as Promise<FC>),
       fetch(`/api/v1/deployments`).then((r) => r.json() as Promise<FC>),
       fetch(`/api/v1/species?hours=${hours}${query ? `&q=${encodeURIComponent(query)}` : ""}`).then((r) => r.json() as Promise<Species[]>),
       fetch(`/api/v1/insights`).then((r) => r.json() as Promise<Insights>),
+      fetch(`/api/v1/status`).then((r) => r.json() as Promise<Status>),
     ]);
-    setEvents(ev); setDeployments(dep); setSpeciesList(sp); setInsights(ins); setFetchedAt(Date.now());
-    const names = [...new Set([...ins.drift, ...ins.movers, ...ins.arrivals].map((x) => x.scientificName).concat(sp.slice(0, 15).map((x) => x.scientificName)))];
-    const missing = names.filter((n) => !(n in thumbsRef.current)).slice(0, 40);
+    setEvents(ev); setDeployments(dep); setSpeciesList(sp); setInsights(ins); setStatus(st); setFetchedAt(Date.now());
+    const names = [...new Set([...ins.drift, ...ins.movers, ...ins.arrivals].map((x) => x.scientificName).concat(sp.slice(0, 15).map((x) => x.scientificName), ev.features.slice(0, 40).map((f) => String(f.properties.sci))))];
+    const missing = names.filter((n) => n && n !== "null" && !(n in thumbsRef.current)).slice(0, 40);
     if (missing.length) {
       const m = (await fetch(`/api/v1/media?names=${encodeURIComponent(missing.join(","))}`).then((r) => r.json())) as Record<string, { thumbUrl: string | null }>;
       setThumbs((t) => { const next = { ...t }; for (const n of missing) next[n] = m[n]?.thumbUrl ?? null; thumbsRef.current = next; return next; });
@@ -122,7 +128,7 @@ export default function WorldMap() {
       const max = Math.max(1, ...d.cells.map((c) => c.n));
       if (d.cells.length && mapRef.current) {
         const lats = d.cells.map((c) => c.lat), lons = d.cells.map((c) => c.lon);
-        mapRef.current.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons) + 5, Math.max(...lats) + 5]], { padding: { top: 40, bottom: 80, left: 380, right: 40 }, maxZoom: 5, duration: 1200 });
+        mapRef.current.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons) + 5, Math.max(...lats) + 5]], { padding: { top: 60, bottom: 90, left: 480, right: 40 }, maxZoom: 5, duration: 1200 });
       }
       setCells({
         type: "FeatureCollection",
@@ -162,88 +168,160 @@ export default function WorldMap() {
   }, [playing, hours]);
 
   const total = hours * 3600_000;
-  const pick = (name: string) => { setSpecies(name); setPlayhead(null); setPlaying(false); };
+  const pick = (name: string) => { setSpecies(name); setPlayhead(null); setPlaying(false); setTab("now"); };
+  const flyTo = (f: GeoJSON.Feature<GeoJSON.Geometry, Record<string, unknown>>) => {
+    const c = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+    mapRef.current?.flyTo({ center: c, zoom: Math.max(mapRef.current.getZoom(), 6), duration: 900 });
+  };
+  const panelOpen = tab !== null || species !== null;
 
   return (
-    <div className="relative h-screen w-screen bg-slate-950 text-slate-100 font-sans">
+    <div className="relative h-screen w-screen bg-slate-950 text-slate-100 font-sans overflow-hidden">
       <div className="absolute inset-0"><div ref={containerRef} className="h-full w-full" /></div>
 
-      <aside className="absolute left-3 top-3 bottom-3 w-[21rem] flex flex-col rounded-xl bg-slate-900/85 backdrop-blur border border-slate-700/60 overflow-hidden">
-        <div className="px-4 pt-3 pb-2 border-b border-slate-800">
-          <div className="flex items-baseline justify-between">
-            <h1 className="text-base font-semibold tracking-tight">WildNetwork</h1>
-            {insights && <span className="text-[11px] text-slate-500 tabular-nums">{insights.coverage.detections.toLocaleString()} detections · {insights.coverage.species} species</span>}
-          </div>
+      {/* Top bar */}
+      <header className="absolute top-0 inset-x-0 h-11 bg-black/80 backdrop-blur-xl border-b border-white/10 flex items-center px-3 gap-3 z-20">
+        <span className="font-semibold tracking-tight">WildNetwork</span>
+        <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
+          <span className={`inline-block w-2 h-2 rounded-full ${status?.live ? "bg-[#7fd320]" : "bg-[#d0031b]"}`} />
+          {status?.live ? "Live" : "Stale"}{status?.lastPullAt && <span className="hidden sm:inline"> · updated {relTime(status.lastPullAt)}</span>}
+        </span>
+        <div className="flex-1" />
+        <div className="relative w-64 max-w-[40vw]">
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search a species"
-            className="mt-2 w-full rounded-md bg-slate-800 px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-cyan-600" />
+            className="w-full rounded-md bg-white/10 px-2.5 py-1 text-sm outline-none focus:bg-white/15 placeholder:text-slate-500" />
           {query && (
-            <div className="mt-1 max-h-40 overflow-y-auto">
+            <div className="absolute top-full mt-1 left-0 right-0 max-h-72 overflow-y-auto rounded-md bg-slate-900 border border-slate-700 shadow-xl">
               {speciesList.slice(0, 20).map((s) => (
-                <button key={s.scientificName} onClick={() => { pick(s.scientificName); setQuery(""); }} className="w-full text-left px-2 py-1 rounded hover:bg-slate-800 text-sm">
-                  {s.vernacularName ?? s.scientificName} <span className="text-slate-500 text-xs italic">{s.scientificName}</span>
+                <button key={s.scientificName} onClick={() => { pick(s.scientificName); setQuery(""); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-800 text-sm flex items-center gap-2">
+                  <Thumb src={thumbs[s.scientificName]} size={6} />
+                  <span className="truncate">{s.vernacularName ?? s.scientificName}</span>
+                  <span className="text-slate-500 text-xs italic truncate">{s.scientificName}</span>
                 </button>
               ))}
             </div>
           )}
         </div>
+        <span className="hidden md:inline text-[11px] text-slate-500 tabular-nums">
+          {status ? `${status.detections.toLocaleString()} detections · ${status.species.toLocaleString()} species · ${status.sensors.toLocaleString()} sensors` : ""}
+        </span>
+      </header>
 
-        {species ? (
-          <SpeciesPanel name={species} onClose={() => setSpecies(null)} />
-        ) : (
-          <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4">
-            <Section title="Moving" hint="Centroid shift per continent, 3 days vs week before">
-              {insights?.drift.map((d) => (
-                <Row key={d.scientificName + d.region} thumb={thumbs[d.scientificName]} onClick={() => pick(d.scientificName)} name={d.vernacularName ?? d.scientificName} sci={`${d.scientificName} · ${d.region}`}
-                  value={`${Math.abs(d.driftDeg).toFixed(1)}° ${d.driftDeg > 0 ? "N" : "S"}`} tone={d.driftDeg > 0 ? "warm" : "cool"} />
-              ))}
-            </Section>
-            <Section title="Surging and fading" hint="Yesterday vs 7-day average">
-              {insights?.movers.map((m) => (
-                <Row key={m.scientificName} thumb={thumbs[m.scientificName]} onClick={() => pick(m.scientificName)} name={m.vernacularName ?? m.scientificName} sci={m.scientificName}
-                  value={`${m.ratio >= 1 ? "×" + m.ratio.toFixed(1) : "÷" + (1 / m.ratio).toFixed(1)}`} tone={m.ratio >= 1 ? "warm" : "cool"} />
-              ))}
-            </Section>
-            <Section title="New arrivals" hint="First time in a 5° cell in 12 days">
-              {insights?.arrivals.map((a) => (
-                <Row key={`${a.scientificName}${a.cellLat}${a.cellLon}`} thumb={thumbs[a.scientificName]} onClick={() => pick(a.scientificName)} name={a.vernacularName ?? a.scientificName} sci={a.scientificName}
-                  value={`${a.cellLat}°, ${a.cellLon}°`} tone="neutral" />
-              ))}
-            </Section>
-            <Section title="Most detected" hint={`Last ${hours < 24 ? hours + "h" : hours / 24 + "d"}`}>
-              {speciesList.slice(0, 15).map((s) => (
-                <Row key={s.scientificName} thumb={thumbs[s.scientificName]} onClick={() => pick(s.scientificName)} name={s.vernacularName ?? s.scientificName} sci={s.scientificName} value={s.count.toLocaleString()} tone="neutral" />
-              ))}
-            </Section>
+      {/* Icon rail */}
+      <nav className="absolute left-0 top-11 bottom-0 w-[4.375rem] bg-black/80 backdrop-blur-xl border-r border-white/10 flex flex-col items-center py-2 gap-1 z-20">
+        <RailButton label="Now" active={tab === "now" && !species} onClick={() => { setTab("now"); setSpecies(null); }} icon={<path d="M3 12h4l3-8 4 16 3-8h4" />} />
+        <RailButton label="Feed" active={tab === "feed" && !species} onClick={() => { setTab("feed"); setSpecies(null); }} icon={<><path d="M4 6h16M4 12h16M4 18h10" /></>} />
+        <RailButton label="About" active={tab === "about" && !species} onClick={() => { setTab("about"); setSpecies(null); }} icon={<><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></>} />
+        <div className="flex-1" />
+        <RailButton label="Hide" active={false} onClick={() => { setTab(null); setSpecies(null); }} icon={<path d="M15 6l-6 6 6 6" />} />
+      </nav>
+
+      {/* Panel */}
+      {panelOpen && (
+        <aside className="absolute left-[4.375rem] top-11 bottom-0 w-[24rem] max-w-[calc(100vw-4.375rem)] bg-slate-900/95 backdrop-blur-xl border-r border-white/10 flex flex-col z-10">
+          {species ? (
+            <SpeciesPanel name={species} onClose={() => setSpecies(null)} />
+          ) : tab === "about" ? (
+            <AboutPanel />
+          ) : tab === "feed" ? (
+            <div className="flex-1 overflow-y-auto">
+              <div className="px-4 py-2 text-[11px] text-slate-500 border-b border-white/5">Latest detections · {events.features.length.toLocaleString()} in the last {hours < 24 ? hours + "h" : hours / 24 + "d"}</div>
+              {events.features.slice(0, 200).map((f) => {
+                const p = f.properties as Record<string, string>;
+                return (
+                  <div key={p.id} className="flex items-center gap-3 h-[3.85rem] px-3 border-b border-white/5 hover:bg-white/5">
+                    <button onClick={() => pick(p.sci)} className="shrink-0"><Thumb src={thumbs[p.sci]} size={10} /></button>
+                    <button onClick={() => pick(p.sci)} className="min-w-0 flex-1 text-left">
+                      <div className="text-sm truncate">{p.common ?? p.sci}</div>
+                      <div className="text-[11px] text-slate-500 truncate">{p.source} · conf {Number(p.conf).toFixed(2)}</div>
+                    </button>
+                    <span className="text-[11px] text-slate-400 tabular-nums shrink-0">{relTime(p.t)}</span>
+                    <button onClick={() => flyTo(f)} aria-label="Jump to location" className="shrink-0 w-7 h-7 rounded hover:bg-white/10 text-slate-400 hover:text-white grid place-items-center">
+                      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4">
+              <Section title="Moving" hint="Centroid shift per continent, 3 days vs week before">
+                {insights?.drift.map((d) => (
+                  <Row key={d.scientificName + d.region} thumb={thumbs[d.scientificName]} onClick={() => pick(d.scientificName)} name={d.vernacularName ?? d.scientificName} sci={`${d.scientificName} · ${d.region}`}
+                    value={`${Math.abs(d.driftDeg).toFixed(1)}° ${d.driftDeg > 0 ? "N" : "S"}`} tone={d.driftDeg > 0 ? "warm" : "cool"} />
+                ))}
+              </Section>
+              <Section title="Surging and fading" hint="Yesterday vs 7-day average">
+                {insights?.movers.map((m) => (
+                  <Row key={m.scientificName} thumb={thumbs[m.scientificName]} onClick={() => pick(m.scientificName)} name={m.vernacularName ?? m.scientificName} sci={m.scientificName}
+                    value={`${m.ratio >= 1 ? "×" + m.ratio.toFixed(1) : "÷" + (1 / m.ratio).toFixed(1)}`} tone={m.ratio >= 1 ? "warm" : "cool"} />
+                ))}
+              </Section>
+              <Section title="New arrivals" hint="First time in a 5° cell in 12 days">
+                {insights?.arrivals.map((a) => (
+                  <Row key={`${a.scientificName}${a.cellLat}${a.cellLon}`} thumb={thumbs[a.scientificName]} onClick={() => pick(a.scientificName)} name={a.vernacularName ?? a.scientificName} sci={a.scientificName}
+                    value={`${a.cellLat}°, ${a.cellLon}°`} tone="neutral" />
+                ))}
+              </Section>
+              <Section title="Most detected" hint={`Last ${hours < 24 ? hours + "h" : hours / 24 + "d"}`}>
+                {speciesList.slice(0, 15).map((s) => (
+                  <Row key={s.scientificName} thumb={thumbs[s.scientificName]} onClick={() => pick(s.scientificName)} name={s.vernacularName ?? s.scientificName} sci={s.scientificName} value={s.count.toLocaleString()} tone="neutral" />
+                ))}
+              </Section>
+            </div>
+          )}
+          <div className="px-4 py-2 border-t border-white/5 text-[11px] text-slate-400 flex flex-wrap gap-x-3 gap-y-1">
+            <Legend color="#0891b2" label="BirdWeather" /><Legend color="#65a30d" label="iNaturalist" /><Legend color="#db2777" label="WDX devices" />
+            <span className="text-slate-500">{deployments.features.length.toLocaleString()} sensors</span>
           </div>
-        )}
+        </aside>
+      )}
 
-        <div className="px-4 py-2 border-t border-slate-800 text-[11px] text-slate-400 flex flex-wrap gap-x-3 gap-y-1">
-          <Legend color="#0891b2" label="BirdWeather" /><Legend color="#65a30d" label="iNaturalist" /><Legend color="#db2777" label="WDX devices" />
-          <span className="text-slate-500">{deployments.features.length.toLocaleString()} sensors</span>
-        </div>
-      </aside>
-
-      <div className="absolute left-[23rem] right-3 bottom-3 rounded-xl bg-slate-900/85 backdrop-blur border border-slate-700/60 px-3 py-2 flex items-center gap-3">
+      {/* Time slider */}
+      <div className={`absolute right-6 bottom-6 ${panelOpen ? "left-[30rem]" : "left-24"} h-[3.75rem] rounded-lg bg-black/70 backdrop-blur-xl border border-white/10 px-4 flex items-center gap-3 z-10 transition-[left]`}>
         <div className="flex gap-1">
           {HOURS.map((h) => (
             <button key={h} onClick={() => { setHours(h); setPlayhead(null); setPlaying(false); }}
-              className={`text-xs rounded px-2 py-1 ${h === hours ? "bg-slate-200 text-slate-900 font-medium" : "bg-slate-800 hover:bg-slate-700"}`}>
+              className={`text-xs rounded px-2 py-1 ${h === hours ? "bg-white/90 text-slate-900 font-medium" : "bg-white/10 hover:bg-white/20"}`}>
               {h < 24 ? `${h}h` : `${h / 24}d`}
             </button>
           ))}
         </div>
-        <button onClick={() => { setPlaying((p) => !p); if (playhead === null) setPlayhead(0); }} className="rounded bg-cyan-700 hover:bg-cyan-600 text-sm px-3 py-1">
+        <button onClick={() => { setPlaying((p) => !p); if (playhead === null) setPlayhead(0); }} className="rounded bg-[#006cd9] hover:bg-[#2b84e6] text-sm px-3 py-1 font-medium">
           {playing ? "Pause" : "Play"}
         </button>
         <input type="range" min={0} max={total} step={total / 600} value={playhead ?? total}
-          onChange={(e) => { setPlaying(false); setPlayhead(Number(e.target.value)); }} className="flex-1 accent-cyan-500" />
+          onChange={(e) => { setPlaying(false); setPlayhead(Number(e.target.value)); }} className="flex-1 accent-[#006cd9]" />
         <button onClick={() => { setPlaying(false); setPlayhead(null); }} className="text-xs text-slate-400 hover:text-white">All</button>
-        <span className="text-xs text-slate-300 tabular-nums w-40 text-right">
+        <span className="text-xs text-slate-300 tabular-nums w-40 text-right hidden sm:inline">
           {playhead === null ? `${events.features.length.toLocaleString()} events` : new Date(windowStart + playhead).toLocaleString()}
         </span>
       </div>
     </div>
   );
+}
+
+function relTime(iso: string) {
+  const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+  if (s < 60) return `${Math.round(s)}s ago`;
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  return `${Math.round(s / 86400)}d ago`;
+}
+
+function RailButton({ label, active, onClick, icon }: { label: string; active: boolean; onClick: () => void; icon: React.ReactNode }) {
+  return (
+    <button onClick={onClick} className={`w-14 h-14 rounded-md flex flex-col items-center justify-center gap-1 text-[10px] ${active ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"}`}>
+      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{icon}</svg>
+      {label}
+    </button>
+  );
+}
+
+function Thumb({ src, size }: { src?: string | null; size: 6 | 8 | 10 }) {
+  const cls = size === 6 ? "w-6 h-6" : size === 8 ? "w-8 h-8" : "w-10 h-10";
+  // eslint-disable-next-line @next/next/no-img-element
+  return src ? <img src={src} alt="" className={`${cls} rounded-full object-cover shrink-0 bg-slate-800`} loading="lazy" /> : <span className={`${cls} rounded-full bg-slate-800 shrink-0 inline-block`} />;
 }
 
 function Section({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
@@ -259,11 +337,10 @@ function Section({ title, hint, children }: { title: string; hint: string; child
 }
 
 function Row({ name, sci, value, tone, onClick, thumb }: { name: string; sci: string; value: string; tone: "warm" | "cool" | "neutral"; onClick: () => void; thumb?: string | null }) {
-  const toneCls = tone === "warm" ? "text-orange-400" : tone === "cool" ? "text-blue-400" : "text-slate-300";
+  const toneCls = tone === "warm" ? "text-[#E76826]" : tone === "cool" ? "text-[#268cfb]" : "text-slate-300";
   return (
-    <button onClick={onClick} className="flex items-center justify-between gap-2 px-2 py-1 -mx-2 rounded hover:bg-slate-800 text-left">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      {thumb ? <img src={thumb} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 bg-slate-800" loading="lazy" /> : <span className="w-8 h-8 rounded-full bg-slate-800 shrink-0" />}
+    <button onClick={onClick} className="flex items-center gap-2 px-2 py-1 -mx-2 rounded hover:bg-white/5 text-left">
+      <Thumb src={thumb} size={8} />
       <span className="min-w-0 flex-1"><span className="text-sm block truncate">{name}</span><span className="text-[11px] text-slate-500 italic block truncate">{sci}</span></span>
       <span className={`text-xs tabular-nums shrink-0 ${toneCls}`}>{value}</span>
     </button>

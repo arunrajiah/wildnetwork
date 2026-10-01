@@ -14,9 +14,14 @@ Next.js 16 App Router (Turbopack), TypeScript, Tailwind 4, MapLibre GL 6 (OpenFr
 - src/lib/rollups.ts: species_daily rollups (BirdWeather via topSpecies aggregate per 5-degree cell per day, other sources from events)
 - src/app/api/v1/insights: movers / centroid drift / arrivals from species_daily; src/app/api/v1/species/[name]: 30-day series + Open-Meteo weather at centroid
 - src/app/api/cron/rollup: hourly refresh of today+yesterday rollups
-- src/components/WorldMap.tsx: map + insights rail + time slider; SpeciesPanel.tsx: species charts (inline SVG, single series each, no dual axes)
+- src/components/WorldMap.tsx: EarthRanger-style shell (44px top bar with live dot, 70px icon rail: Now/Feed/About, 24rem panel, floating time slider); SpeciesPanel.tsx: hero image + charts (inline SVG, single series each); AboutPanel.tsx: credits
+- src/lib/media.ts + /api/v1/media: cached species image/blurb (Wikipedia, iNat CC fallback) in species_media
+- /api/v1/status: live dot + totals
 - drizzle/*.sql: plain SQL migrations applied in order by scripts/migrate.mts
 - public/maplibre/: worker files copied by postinstall (gitignored); MapLibre 6 worker needs them under Turbopack
+
+## Deploy
+Vercel project wildnetwork (Hobby: crons daily only) + Neon Postgres (wildnetwork-db, PostGIS). Prod URL https://wildnetwork-beige.vercel.app. Push to main auto-deploys. Ingest every 5 min via .github/workflows/ingest.yml (secrets CRON_SECRET, var APP_URL). Migrate prod: `pnpm exec tsx --env-file=.env.production.local scripts/migrate.mts` (pull env with `vercel env pull .env.production.local --environment=production`).
 
 ## Commands
 - pnpm db:up (docker compose Postgres on :5433), pnpm db:migrate (applies all drizzle/*.sql, idempotent)

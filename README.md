@@ -34,6 +34,12 @@ curl -X POST http://localhost:3000/api/v1/events \
 - `GET /api/v1/deployments` all sensor sites with 24h counts
 - `GET /api/v1/species?hours=24&q=robin` ranked species list
 
-## Data and attribution
+**Live site:** https://wildnetwork-beige.vercel.app
 
-BirdWeather station data, iNaturalist contributors (CC0 / CC-BY only), WDX producers. Basemap: OpenFreeMap, OpenMapTiles, OpenStreetMap contributors.
+## Credits
+
+Made by [Arun Rajiah](https://www.arunrajiah.com), alongside [WDX](https://github.com/arunrajiah/wildlife-detection-exchange), [BirdEcho](https://github.com/arunrajiah/birdecho), [WildEcho](https://github.com/arunrajiah/wildecho) and [SpeciesNet Studio](https://github.com/arunrajiah/speciesnet-studio).
+
+Data: [BirdWeather](https://www.birdweather.com) community stations; [iNaturalist](https://www.inaturalist.org) observers (CC0 / CC BY records only); [Open-Meteo](https://open-meteo.com) ERA5 weather (CC BY 4.0); [Wikipedia](https://www.wikipedia.org) and Wikimedia Commons contributors for species photos and descriptions (CC BY-SA); every WDX producer pushing events from their own devices.
+
+Built with [MapLibre GL](https://maplibre.org), [OpenFreeMap](https://openfreemap.org) tiles from [OpenMapTiles](https://openmaptiles.org) and [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, [PostGIS](https://postgis.net) on [Neon](https://neon.tech), Next.js on Vercel. Interface patterns inspired by [EarthRanger](https://www.earthranger.com) (Apache 2.0).
