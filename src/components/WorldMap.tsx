@@ -46,6 +46,16 @@ export default function WorldMap() {
   const [thumbs, setThumbs] = useState<Record<string, string | null>>({});
   const [tab, setTab] = useState<"now" | "feed" | "about" | null>("now");
   const [loading, setLoading] = useState(true);
+  const [results, setResults] = useState<Species[]>([]);
+  // Search has its own debounced request, so typing does not reload the map.
+  useEffect(() => {
+    if (query.trim().length < 2) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      fetch(`/api/v1/species?q=${encodeURIComponent(query.trim())}`).then((r) => r.json()).then((d: Species[]) => { if (!cancelled) setResults(d); });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query]);
   const [status, setStatus] = useState<Status | null>(null);
   const [movement, setMovement] = useState<Movement | null>(null);
   const [frame, setFrame] = useState<number | null>(null); // index into movement.frames; null = live view
@@ -125,7 +135,7 @@ export default function WorldMap() {
     const [ev, dep, sp, ins, st] = await Promise.all([
       fetch(`/api/v1/events?${u}`).then((r) => r.json() as Promise<FC>),
       fetch(`/api/v1/deployments`).then((r) => r.json() as Promise<FC>),
-      fetch(`/api/v1/species?hours=${hours}${query ? `&q=${encodeURIComponent(query)}` : ""}`).then((r) => r.json() as Promise<Species[]>),
+      fetch(`/api/v1/species?hours=${hours}`).then((r) => r.json() as Promise<Species[]>),
       fetch(`/api/v1/insights`).then((r) => r.json() as Promise<Insights>),
       fetch(`/api/v1/status`).then((r) => r.json() as Promise<Status>),
     ]);
@@ -136,7 +146,7 @@ export default function WorldMap() {
       const m = (await fetch(`/api/v1/media?names=${encodeURIComponent(missing.join(","))}`).then((r) => r.json())) as Record<string, { thumbUrl: string | null }>;
       setThumbs((t) => { const next = { ...t }; for (const n of missing) next[n] = m[n]?.thumbUrl ?? null; thumbsRef.current = next; return next; });
     }
-  }, [hours, species, query]);
+  }, [hours, species]);
 
   useEffect(() => {
     const t0 = setTimeout(load, 0);
@@ -292,9 +302,10 @@ export default function WorldMap() {
         <div className="relative w-64 max-w-[40vw]">
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search a species"
             className="w-full rounded-md bg-white/10 px-2.5 py-1 text-sm outline-none focus:bg-white/15 placeholder:text-slate-500" />
-          {query && (
+          {query.trim().length >= 2 && (
             <div className="absolute top-full mt-1 left-0 right-0 max-h-72 overflow-y-auto rounded-md bg-slate-900 border border-slate-700 shadow-xl">
-              {speciesList.slice(0, 20).map((s) => (
+              {results.length === 0 && <div className="px-3 py-2 text-sm text-slate-500">No species found</div>}
+              {results.slice(0, 20).map((s) => (
                 <button key={s.scientificName} onClick={() => { pick(s.scientificName); setQuery(""); }} className="w-full text-left px-3 py-1.5 hover:bg-slate-800 text-sm flex items-center gap-2">
                   <Thumb src={thumbs[s.scientificName]} size={6} />
                   <span className="truncate">{s.vernacularName ?? s.scientificName}</span>
