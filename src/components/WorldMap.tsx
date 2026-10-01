@@ -37,7 +37,9 @@ export default function WorldMap() {
   const [fetchedAt, setFetchedAt] = useState(0);
   const [playhead, setPlayhead] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [thumbs, setThumbs] = useState<Record<string, string | null>>({});
 
+  const thumbsRef = useRef<Record<string, string | null>>({});
   const windowStart = useMemo(() => fetchedAt - hours * 3600_000, [fetchedAt, hours]);
 
   useEffect(() => {
@@ -97,6 +99,12 @@ export default function WorldMap() {
       fetch(`/api/v1/insights`).then((r) => r.json() as Promise<Insights>),
     ]);
     setEvents(ev); setDeployments(dep); setSpeciesList(sp); setInsights(ins); setFetchedAt(Date.now());
+    const names = [...new Set([...ins.drift, ...ins.movers, ...ins.arrivals].map((x) => x.scientificName).concat(sp.slice(0, 15).map((x) => x.scientificName)))];
+    const missing = names.filter((n) => !(n in thumbsRef.current)).slice(0, 40);
+    if (missing.length) {
+      const m = (await fetch(`/api/v1/media?names=${encodeURIComponent(missing.join(","))}`).then((r) => r.json())) as Record<string, { thumbUrl: string | null }>;
+      setThumbs((t) => { const next = { ...t }; for (const n of missing) next[n] = m[n]?.thumbUrl ?? null; thumbsRef.current = next; return next; });
+    }
   }, [hours, species, query]);
 
   useEffect(() => {
@@ -185,25 +193,25 @@ export default function WorldMap() {
           <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4">
             <Section title="Moving" hint="Centroid shift per continent, 3 days vs week before">
               {insights?.drift.map((d) => (
-                <Row key={d.scientificName + d.region} onClick={() => pick(d.scientificName)} name={d.vernacularName ?? d.scientificName} sci={`${d.scientificName} · ${d.region}`}
+                <Row key={d.scientificName + d.region} thumb={thumbs[d.scientificName]} onClick={() => pick(d.scientificName)} name={d.vernacularName ?? d.scientificName} sci={`${d.scientificName} · ${d.region}`}
                   value={`${Math.abs(d.driftDeg).toFixed(1)}° ${d.driftDeg > 0 ? "N" : "S"}`} tone={d.driftDeg > 0 ? "warm" : "cool"} />
               ))}
             </Section>
             <Section title="Surging and fading" hint="Yesterday vs 7-day average">
               {insights?.movers.map((m) => (
-                <Row key={m.scientificName} onClick={() => pick(m.scientificName)} name={m.vernacularName ?? m.scientificName} sci={m.scientificName}
+                <Row key={m.scientificName} thumb={thumbs[m.scientificName]} onClick={() => pick(m.scientificName)} name={m.vernacularName ?? m.scientificName} sci={m.scientificName}
                   value={`${m.ratio >= 1 ? "×" + m.ratio.toFixed(1) : "÷" + (1 / m.ratio).toFixed(1)}`} tone={m.ratio >= 1 ? "warm" : "cool"} />
               ))}
             </Section>
             <Section title="New arrivals" hint="First time in a 5° cell in 12 days">
               {insights?.arrivals.map((a) => (
-                <Row key={`${a.scientificName}${a.cellLat}${a.cellLon}`} onClick={() => pick(a.scientificName)} name={a.vernacularName ?? a.scientificName} sci={a.scientificName}
+                <Row key={`${a.scientificName}${a.cellLat}${a.cellLon}`} thumb={thumbs[a.scientificName]} onClick={() => pick(a.scientificName)} name={a.vernacularName ?? a.scientificName} sci={a.scientificName}
                   value={`${a.cellLat}°, ${a.cellLon}°`} tone="neutral" />
               ))}
             </Section>
             <Section title="Most detected" hint={`Last ${hours < 24 ? hours + "h" : hours / 24 + "d"}`}>
               {speciesList.slice(0, 15).map((s) => (
-                <Row key={s.scientificName} onClick={() => pick(s.scientificName)} name={s.vernacularName ?? s.scientificName} sci={s.scientificName} value={s.count.toLocaleString()} tone="neutral" />
+                <Row key={s.scientificName} thumb={thumbs[s.scientificName]} onClick={() => pick(s.scientificName)} name={s.vernacularName ?? s.scientificName} sci={s.scientificName} value={s.count.toLocaleString()} tone="neutral" />
               ))}
             </Section>
           </div>
@@ -250,11 +258,13 @@ function Section({ title, hint, children }: { title: string; hint: string; child
   );
 }
 
-function Row({ name, sci, value, tone, onClick }: { name: string; sci: string; value: string; tone: "warm" | "cool" | "neutral"; onClick: () => void }) {
+function Row({ name, sci, value, tone, onClick, thumb }: { name: string; sci: string; value: string; tone: "warm" | "cool" | "neutral"; onClick: () => void; thumb?: string | null }) {
   const toneCls = tone === "warm" ? "text-orange-400" : tone === "cool" ? "text-blue-400" : "text-slate-300";
   return (
     <button onClick={onClick} className="flex items-center justify-between gap-2 px-2 py-1 -mx-2 rounded hover:bg-slate-800 text-left">
-      <span className="min-w-0"><span className="text-sm block truncate">{name}</span><span className="text-[11px] text-slate-500 italic block truncate">{sci}</span></span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {thumb ? <img src={thumb} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 bg-slate-800" loading="lazy" /> : <span className="w-8 h-8 rounded-full bg-slate-800 shrink-0" />}
+      <span className="min-w-0 flex-1"><span className="text-sm block truncate">{name}</span><span className="text-[11px] text-slate-500 italic block truncate">{sci}</span></span>
       <span className={`text-xs tabular-nums shrink-0 ${toneCls}`}>{value}</span>
     </button>
   );

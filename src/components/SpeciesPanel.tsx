@@ -45,8 +45,16 @@ function Line({ values, labels, format, color, title }: { values: (number | null
   );
 }
 
+interface Media { title: string | null; thumbUrl: string | null; imageUrl: string | null; extract: string | null; pageUrl: string | null; source: string; attribution: string | null; license: string | null }
+
 export default function SpeciesPanel({ name, onClose }: { name: string; onClose: () => void }) {
   const [data, setData] = useState<SpeciesDetail | null>(null);
+  const [media, setMedia] = useState<Media | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/v1/media?names=${encodeURIComponent(name)}`).then((r) => r.json()).then((d) => { if (!cancelled) setMedia(d[name] ?? null); });
+    return () => { cancelled = true; };
+  }, [name]);
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/v1/species/${encodeURIComponent(name)}`).then((r) => r.json()).then((d) => { if (!cancelled) setData(d); });
@@ -63,14 +71,21 @@ export default function SpeciesPanel({ name, onClose }: { name: string; onClose:
   const corr = pearson(days.map((d) => d.n), days.map((d) => d.weather?.tmax ?? null));
 
   return (
-    <div className="flex flex-col gap-3 p-4 h-full overflow-y-auto">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h2 className="text-base font-semibold leading-tight">{data.vernacularName ?? data.scientificName}</h2>
-          <p className="text-xs text-slate-400 italic">{data.scientificName}</p>
+    <div className="flex flex-col gap-3 h-full overflow-y-auto">
+      <div className="relative">
+        {media?.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={media.thumbUrl ?? media.imageUrl} alt={media.title ?? name} className="w-full h-40 object-cover" />
+        ) : <div className="w-full h-16 bg-slate-800" />}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900 to-transparent h-20" />
+        <button onClick={onClose} aria-label="Close" className="absolute top-2 right-2 rounded-full bg-slate-900/70 text-slate-200 hover:text-white w-7 h-7 text-sm">✕</button>
+        <div className="absolute left-4 bottom-2">
+          <h2 className="text-base font-semibold leading-tight drop-shadow">{data.vernacularName ?? data.scientificName}</h2>
+          <p className="text-xs text-slate-300 italic">{data.scientificName}</p>
         </div>
-        <button onClick={onClose} className="text-slate-400 hover:text-white text-sm px-2">✕</button>
       </div>
+      <div className="px-4 flex flex-col gap-3">
+      {media?.extract && <p className="text-xs text-slate-300 leading-relaxed">{media.extract.split(". ").slice(0, 2).join(". ").replace(/\.$/, "")}.{media.pageUrl && <> <a href={media.pageUrl} target="_blank" rel="noreferrer" className="text-cyan-500 hover:underline">Wikipedia</a></>}</p>}
       <dl className="grid grid-cols-3 gap-2 text-xs">
         <Stat label="Detections, 30d" value={total.toLocaleString()} />
         <Stat label="Centroid drift" value={drift == null ? "n/a" : `${Math.abs(drift).toFixed(1)}° ${drift > 0 ? "north" : "south"}`} />
@@ -80,9 +95,11 @@ export default function SpeciesPanel({ name, onClose }: { name: string; onClose:
       <Line title="Centroid latitude" values={days.map((d) => d.lat)} labels={labels} format={(v) => `${v.toFixed(1)}°`} color="#a78bfa" />
       <Line title="Max temperature at centroid (°C)" values={days.map((d) => d.weather?.tmax ?? null)} labels={labels} format={(v) => `${v.toFixed(0)}°`} color="#fb923c" />
       <Line title="Max wind at centroid (km/h)" values={days.map((d) => d.weather?.wind ?? null)} labels={labels} format={(v) => `${v.toFixed(0)}`} color="#94a3b8" />
-      <p className="text-[11px] text-slate-500">
+      <p className="text-[11px] text-slate-500 pb-4">
         Sources: {data.sources.join(", ")}. Weather: Open-Meteo ERA5 at the daily detection centroid. Map squares show change in the last 3 days versus the week before.
+        {media?.attribution && <> Photo: {media.attribution} ({media.license}).</>}
       </p>
+      </div>
     </div>
   );
 }
