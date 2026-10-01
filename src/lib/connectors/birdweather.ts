@@ -3,12 +3,12 @@ import type { PullConnector } from "./types";
 
 const ENDPOINT = "https://app.birdweather.com/graphql";
 const PAGE = 500;
-const MAX_PAGES = 40; // per run (20k events); cursor carries over
-const MIN_CONFIDENCE = 0.7;
+const MAX_PAGES = 6; // 3,000 events per run: the live layer is a sample, history comes from rollups
+const MIN_CONFIDENCE = 0.8;
 
 const QUERY = `
 query Pull($from: ISO8601Date!, $to: ISO8601Date!, $after: String, $first: Int!, $conf: Float!) {
-  detections(period: {from: $from, to: $to}, after: $after, first: $first, confidenceGte: $conf, sortBy: "timestamp_asc") {
+  detections(period: {from: $from, to: $to}, after: $after, first: $first, confidenceGte: $conf, sortBy: "timestamp_desc") {
     pageInfo { hasNextPage endCursor }
     nodes {
       id timestamp confidence probability
@@ -96,7 +96,8 @@ export const birdweather: PullConnector = {
       for (const n of d.nodes) {
         const ev = toWdx(n);
         if (ev) events.push(ev);
-        if (!last || n.timestamp > last) last = n.timestamp;
+        // Timestamps carry different UTC offsets, so compare instants, not strings.
+        if (!last || Date.parse(n.timestamp) > Date.parse(last)) last = new Date(n.timestamp).toISOString();
       }
       if (!d.pageInfo.hasNextPage) break;
       after = d.pageInfo.endCursor;

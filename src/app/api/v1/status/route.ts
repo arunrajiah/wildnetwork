@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { connectors, runConnector } from "@/lib/connectors";
+import { pullAll } from "@/lib/connectors";
 import { sql } from "@/lib/db";
 import { refreshRollups } from "@/lib/rollups";
 
@@ -23,7 +23,7 @@ export async function GET() {
         INSERT INTO pull_state (connector, last_run_at) VALUES ('_visit_lock', now())
         ON CONFLICT (connector) DO UPDATE SET last_run_at = now() WHERE pull_state.last_run_at < now() - interval '4 minutes'
         RETURNING connector`;
-      if (claimed.length) await Promise.all(Object.values(connectors).map(runConnector));
+      if (claimed.length) await pullAll();
     });
   }
   // Hourly rollups ride on the same trigger, with their own lock, so any uptime pinger keeps insights fresh.

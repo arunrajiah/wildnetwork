@@ -11,7 +11,9 @@ export interface IngestResult {
  * Upsert a batch of already-validated WDX events.
  * Dedupe rule (WDX 0.1): same eventId, later review.reviewedAt wins; otherwise later-received wins.
  */
-export async function ingestEvents(events: WdxEvent[]): Promise<IngestResult> {
+export async function ingestEvents(events: WdxEvent[], opts: { keepRaw?: boolean } = {}): Promise<IngestResult> {
+  // Pulled sources can be re-fetched, so their raw JSON is not stored (it is most of the row size).
+  const keepRaw = opts.keepRaw ?? true;
   if (events.length === 0) return { received: 0, inserted: 0, updated: 0 };
 
   // Deployments first (dedupe within batch).
@@ -52,7 +54,7 @@ export async function ingestEvents(events: WdxEvent[]): Promise<IngestResult> {
     license: e.license ?? null,
     latitude: e.deployment.latitude,
     longitude: e.deployment.longitude,
-    raw: sql.json(e as unknown as Parameters<typeof sql.json>[0]),
+    raw: sql.json((keepRaw ? e : {}) as unknown as Parameters<typeof sql.json>[0]),
   }));
 
   let inserted = 0;

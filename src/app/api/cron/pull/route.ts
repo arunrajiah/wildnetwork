@@ -1,4 +1,4 @@
-import { connectors, runConnector } from "@/lib/connectors";
+import { pullAll } from "@/lib/connectors";
 
 export const maxDuration = 300;
 
@@ -8,8 +8,6 @@ export async function GET(req: Request) {
   if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  const only = new URL(req.url).searchParams.get("only");
-  const targets = Object.values(connectors).filter((c) => !only || c.name === only);
-  const results = await Promise.all(targets.map(runConnector));
+  const results = await pullAll(new URL(req.url).searchParams.get("only"));
   return Response.json({ ranAt: new Date().toISOString(), results });
 }
