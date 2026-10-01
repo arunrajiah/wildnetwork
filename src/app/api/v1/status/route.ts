@@ -1,15 +1,30 @@
+import { after } from "next/server";
+import { connectors, runConnector } from "@/lib/connectors";
 import { sql } from "@/lib/db";
+
+export const maxDuration = 300;
 
 /** Live health: last connector runs and totals, for the top-bar status dot. */
 export async function GET() {
   const [pulls, totals] = await Promise.all([
-    sql`SELECT connector, last_run_at, last_count, last_error FROM pull_state ORDER BY connector`,
+    sql`SELECT connector, last_run_at, last_count, last_error FROM pull_state WHERE connector NOT LIKE '\_%' ORDER BY connector`,
     sql`SELECT (SELECT COUNT(*) FROM events WHERE event_start > now() - interval '1 hour') AS events_1h,
                (SELECT COUNT(*) FROM deployments) AS sensors,
                (SELECT SUM(count) FROM species_daily) AS detections,
                (SELECT COUNT(DISTINCT scientific_name) FROM species_daily) AS species`,
   ]);
   const newest = pulls.reduce<number>((m, p) => Math.max(m, p.last_run_at ? new Date(p.last_run_at).getTime() : 0), 0);
+  // Self-healing ingest: if no scheduler has pulled recently, a visit triggers one in the background.
+  // The conditional UPDATE is the lock, so concurrent visitors start at most one pull.
+  if (newest < Date.now() - 4 * 60_000) {
+    after(async () => {
+      const claimed = await sql`
+        INSERT INTO pull_state (connector, last_run_at) VALUES ('_visit_lock', now())
+        ON CONFLICT (connector) DO UPDATE SET last_run_at = now() WHERE pull_state.last_run_at < now() - interval '4 minutes'
+        RETURNING connector`;
+      if (claimed.length) await Promise.all(Object.values(connectors).map(runConnector));
+    });
+  }
   return Response.json({
     live: newest > Date.now() - 15 * 60_000,
     lastPullAt: newest ? new Date(newest).toISOString() : null,
