@@ -6,6 +6,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ICON_IMAGE, registerIcons } from "@/lib/mapIcons";
 import AboutPanel from "./AboutPanel";
+import { track } from "./Analytics";
 import SpeciesPanel, { type SpeciesDetail } from "./SpeciesPanel";
 
 setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
@@ -294,7 +295,7 @@ export default function WorldMap() {
     setSpecies(name); setPlayhead(null); setPlaying(false); setFrame(null); setMvPlaying(false);
     setEvents(EMPTY); setLoading(true);
   };
-  const pick = (name: string) => { selectSpecies(name); setTab("now"); };
+  const pick = (name: string) => { selectSpecies(name); setTab("now"); track("select_species", { species: name }); };
   const flyTo = (f: GeoJSON.Feature<GeoJSON.Geometry, Record<string, unknown>>) => {
     const c = (f.geometry as GeoJSON.Point).coordinates as [number, number];
     mapRef.current?.flyTo({ center: c, zoom: Math.max(mapRef.current.getZoom(), 6), duration: 900 });
@@ -317,7 +318,7 @@ export default function WorldMap() {
         <div className="flex-1" />
         <div className="hidden lg:flex items-center gap-1" role="group" aria-label="Animal class">
           {CLASSES.map((c) => (
-            <button key={c.key} onClick={() => { setGroup(c.key); selectSpecies(null); if (tab === null) setTab("now"); }}
+            <button key={c.key} onClick={() => { track("select_class", { class: c.key }); setGroup(c.key); selectSpecies(null); if (tab === null) setTab("now"); }}
               className={`text-xs rounded px-2 py-1 ${group === c.key ? "bg-white/90 text-slate-900 font-medium" : "text-slate-300 hover:bg-white/10"}`}>
               {c.label}
             </button>
@@ -454,7 +455,7 @@ export default function WorldMap() {
         {species ? (
           <>
             <span className="text-[11px] uppercase tracking-wider text-slate-400 shrink-0 whitespace-nowrap">{activeFrame ? new Date(activeFrame.week).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" }) : "Movement"}</span>
-            <button disabled={frames.length === 0} onClick={() => { setMvPlaying((p) => !p); if (frame === null) setFrame(0); }} className="rounded bg-[#006cd9] hover:bg-[#2b84e6] disabled:opacity-40 text-sm px-3 py-1 font-medium whitespace-nowrap shrink-0">
+            <button disabled={frames.length === 0} onClick={() => { if (!mvPlaying) track("play_year", { species: species ?? "" }); setMvPlaying((p) => !p); if (frame === null) setFrame(0); }} className="rounded bg-[#006cd9] hover:bg-[#2b84e6] disabled:opacity-40 text-sm px-3 py-1 font-medium whitespace-nowrap shrink-0">
               {mvPlaying ? "Pause" : "Play year"}
             </button>
             <input type="range" min={0} max={Math.max(0, frames.length - 1)} aria-label="Week" step={1} value={frame ?? Math.max(0, frames.length - 1)} disabled={frames.length === 0}

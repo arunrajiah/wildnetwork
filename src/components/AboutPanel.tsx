@@ -43,6 +43,15 @@ export default function AboutPanel() {
       </section>
 
       <section>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Privacy</h3>
+        <p>
+          No account, no ads, no tracking by default. If you choose &quot;Allow&quot; when asked, Google Analytics counts your visit and which features you use,
+          so the project can show funders and researchers that it is used. Decline and nothing is sent to Google. To change your mind, clear this site&apos;s
+          data in your browser and you will be asked again.
+        </p>
+      </section>
+
+      <section>
         <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Connect your device</h3>
         <p>
           Running BirdNET-Pi or BirdNET-Go on a Raspberry Pi? One command installs the free <b>wdx-agent</b>, registers your station and starts sending detections.

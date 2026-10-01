@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { track } from "./Analytics";
 
 export interface SpeciesDetail {
   scientificName: string;
@@ -133,7 +134,7 @@ function ArrivalTable({ rows, name }: { rows: Arrival[] | null; name: string }) 
     <div>
       <div className="flex items-baseline justify-between text-xs">
         <span className="text-slate-400">Arrival by latitude · {region}</span>
-        <a href={`/api/v1/arrivals?species=${encodeURIComponent(name)}&format=csv`} className="text-cyan-500 hover:underline">CSV</a>
+        <a href={`/api/v1/arrivals?species=${encodeURIComponent(name)}&format=csv`} onClick={() => track("download_csv", { species: name })} className="text-cyan-500 hover:underline">CSV</a>
       </div>
       <table className="mt-1 w-full text-xs tabular-nums">
         <thead><tr className="text-left text-slate-500"><th className="font-normal py-0.5">Latitude</th><th className="font-normal">Arrives</th><th className="font-normal">Peaks</th><th className="font-normal text-right">Cells</th></tr></thead>

@@ -152,6 +152,8 @@ The public site runs this way, and it fits in free tiers to start.
 5. Deploy the app to Vercel (`vercel --prod`) with `DATABASE_URL` and `CRON_SECRET` set.
 6. Schedule the pull and rollup endpoints (below). Neon scales to zero when idle, so the first request after a quiet period takes about a second.
 
+**Analytics (optional).** Set `NEXT_PUBLIC_GA_ID` to a Google Analytics 4 measurement id. Visitors are asked first, and nothing is loaded from Google unless they allow it. Leave it unset for no analytics at all.
+
 **Deploying elsewhere.** Any Node host with a Postgres + PostGIS database works. The public site runs on Vercel with Neon. Set `DATABASE_URL` and `CRON_SECRET`, run the migrations against the production database, and schedule `GET /api/cron/pull` every few minutes and `GET /api/cron/rollup` hourly with `Authorization: Bearer $CRON_SECRET` (see [.github/workflows/ingest.yml](.github/workflows/ingest.yml)).
 
 ## Project layout
