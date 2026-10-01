@@ -135,7 +135,18 @@ Optional: `pnpm backfill:weekly 52` fills a year of weekly history for the movem
 | `pnpm key:create "<name>" [source]` | Issue a push key by hand |
 | `pnpm lint` / `pnpm exec tsc --noEmit` | Checks that CI runs |
 
-**Deploying.** Any Node host with a Postgres + PostGIS database works. The public site runs on Vercel with Neon. Set `DATABASE_URL` and `CRON_SECRET`, run the migrations against the production database, and schedule `GET /api/cron/pull` every few minutes and `GET /api/cron/rollup` hourly with `Authorization: Bearer $CRON_SECRET` (see [.github/workflows/ingest.yml](.github/workflows/ingest.yml)).
+### Self-host with Neon and Vercel
+
+The public site runs this way, and it fits in free tiers to start.
+
+1. Create a [Neon](https://neon.com) project (or add Neon from the Vercel Marketplace: `vercel integration add neon`). PostGIS is available on Neon; the first migration enables it with `CREATE EXTENSION postgis`.
+2. Put the pooled connection string in `DATABASE_URL`.
+3. Apply the schema: `DATABASE_URL=... pnpm exec tsx scripts/migrate.mts`.
+4. Build history: `DATABASE_URL=... pnpm exec tsx scripts/backfill.mts 14`. Rollups keep the database small: about 200 million detections fit in a few hundred thousand rows.
+5. Deploy the app to Vercel (`vercel --prod`) with `DATABASE_URL` and `CRON_SECRET` set.
+6. Schedule the pull and rollup endpoints (below). Neon scales to zero when idle, so the first request after a quiet period takes about a second.
+
+**Deploying elsewhere.** Any Node host with a Postgres + PostGIS database works. The public site runs on Vercel with Neon. Set `DATABASE_URL` and `CRON_SECRET`, run the migrations against the production database, and schedule `GET /api/cron/pull` every few minutes and `GET /api/cron/rollup` hourly with `Authorization: Bearer $CRON_SECRET` (see [.github/workflows/ingest.yml](.github/workflows/ingest.yml)).
 
 ## Project layout
 
