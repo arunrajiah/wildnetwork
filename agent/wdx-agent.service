@@ -1,0 +1,13 @@
+[Unit]
+Description=wdx-agent: push wildlife detections to WildNetwork
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/wdx-agent/wdx_agent.py --config /etc/wdx-agent.ini
+Restart=always
+RestartSec=30
+User=__USER__
+
+[Install]
+WantedBy=multi-user.target

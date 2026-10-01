@@ -43,10 +43,16 @@ export default function AboutPanel() {
       </section>
 
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Contribute data</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Connect your device</h3>
         <p>
-          Any device can join. Push WDX events to <code className="text-xs bg-slate-800 px-1 rounded">POST /api/v1/events</code> with an API key, or read everything
-          back through the open <code className="text-xs bg-slate-800 px-1 rounded">GET /api/v1/*</code> endpoints. See the repository for the schema and examples.
+          Running BirdNET-Pi or BirdNET-Go on a Raspberry Pi? One command installs the free <b>wdx-agent</b>, registers your station and starts sending detections.
+          Coordinates are rounded to about 1 km before they leave your device.
+        </p>
+        <pre className="mt-2 text-[11px] bg-black/50 border border-white/10 rounded p-2 overflow-x-auto text-slate-200"><code>curl -fsSL https://wildnetwork.arunrajiah.com/agent/install.sh | bash</code></pre>
+        <p className="mt-2">
+          Camera traps work too: point the agent at a folder of SpeciesNet predictions, or have any tool append WDX events to a file. Details in the{" "}
+          <Link href="https://github.com/arunrajiah/wildnetwork/tree/main/agent">agent README</Link>. Everything is readable back through the open{" "}
+          <code className="text-xs bg-slate-800 px-1 rounded">GET /api/v1/*</code> endpoints.
         </p>
       </section>
     </div>

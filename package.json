@@ -11,7 +11,7 @@
     "db:migrate": "tsx --env-file=.env.local scripts/migrate.mts",
     "key:create": "tsx --env-file=.env.local scripts/create-key.mts",
     "pull": "tsx --env-file=.env.local scripts/pull.mts",
-    "postinstall": "mkdir -p public/maplibre && cp node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs public/maplibre/",
+    "postinstall": "mkdir -p public/maplibre && cp node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs public/maplibre/ && mkdir -p public/agent && cp agent/wdx_agent.py agent/install.sh agent/wdx-agent.service public/agent/",
     "backfill": "tsx --env-file=.env.local scripts/backfill.mts",
     "backfill:weekly": "tsx --env-file=.env.local scripts/backfill-weekly.mts"
   },

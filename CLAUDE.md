@@ -18,6 +18,7 @@ Next.js 16 App Router (Turbopack), TypeScript, Tailwind 4, MapLibre GL 6 (OpenFr
 - src/lib/media.ts + /api/v1/media: cached species image/blurb (Wikipedia, iNat CC fallback) in species_media
 - /api/v1/status: live dot + totals; also triggers a background pull via after() when data is >4 min old (lock row '_visit_lock' in pull_state)
 - species_weekly + /api/v1/species/[name]/movement: weekly frames for a year; map slider switches to Movement mode when a species is selected (week-cells layer + per-continent centroid track). Backfill: pnpm backfill:weekly [weeks] (slow, ~2 min per week)
+- agent/: wdx-agent (stdlib Python, sources birdnet-pi/birdnet-go/speciesnet/ndjson) + install.sh + systemd unit; copied to public/agent/ by postinstall and served from the site. /api/v1/register issues source-restricted keys (5 per IP per day)
 - Logo: public/logo.svg = src/app/icon.svg (favicon) + apple-icon.png
 - src/lib/mapIcons.ts + public/icons/er: EarthRanger silhouettes (Apache 2.0) drawn per taxon group (species_media.iconic from iNat) x source colour, symbol layer from zoom 3.5
 - drizzle/*.sql: plain SQL migrations applied in order by scripts/migrate.mts

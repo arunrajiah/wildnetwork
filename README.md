@@ -18,6 +18,14 @@ pnpm pull 60        # pull BirdWeather + iNaturalist every 60s
 pnpm dev            # http://localhost:3000
 ```
 
+## Connect a Raspberry Pi
+
+```bash
+curl -fsSL https://wildnetwork.arunrajiah.com/agent/install.sh | bash
+```
+
+The free [wdx-agent](agent/) detects BirdNET-Pi or BirdNET-Go, registers the station and streams detections. Camera traps (SpeciesNet) and any WDX NDJSON file are supported too.
+
 ## Push your own detections
 
 Create a key, then POST WDX events (single JSON, JSON array, or NDJSON):
