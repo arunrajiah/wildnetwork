@@ -49,3 +49,4 @@ __pycache__/
 # local tooling
 CLAUDE.md
 .claude/
+docs/FUNDING-NOTES.md
