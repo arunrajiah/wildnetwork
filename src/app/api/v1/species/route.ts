@@ -32,5 +32,6 @@ export async function GET(req: Request) {
       count: Number(r.n),
       deployments: Number(r.deployments),
     })),
+    { headers: { "cache-control": "public, s-maxage=60, stale-while-revalidate=300" } },
   );
 }

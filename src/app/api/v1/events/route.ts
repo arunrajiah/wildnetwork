@@ -44,6 +44,7 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   const p = new URL(req.url).searchParams;
   const limit = Math.min(Number(p.get("limit") ?? 5000), 20000);
+  // Round the window start to the minute so identical requests share one CDN cache entry.
   const to = p.get("to") ? new Date(p.get("to")!) : new Date();
   const from = p.get("from") ? new Date(p.get("from")!) : new Date(to.getTime() - 24 * 3600 * 1000);
   const species = p.get("species");
@@ -87,5 +88,5 @@ export async function GET(req: Request) {
         group: r.grp,
       },
     })),
-  });
+  }, { headers: { "cache-control": "public, s-maxage=60, stale-while-revalidate=300" } });
 }

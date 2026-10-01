@@ -23,5 +23,5 @@ export async function GET() {
         events24h: Number(r.events_24h),
       },
     })),
-  });
+  }, { headers: { "cache-control": "public, s-maxage=60, stale-while-revalidate=300" } });
 }

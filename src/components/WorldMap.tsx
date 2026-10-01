@@ -128,24 +128,30 @@ export default function WorldMap() {
     return () => { map.remove(); mapRef.current = null; };
   }, []);
 
+  // Each request paints as soon as it arrives; the map never waits for the slowest one.
   const load = useCallback(async () => {
-    const from = new Date(Date.now() - hours * 3600_000).toISOString();
-    const u = new URLSearchParams({ from, limit: "20000" });
+    const from = new Date(Math.floor((Date.now() - hours * 3600_000) / 300_000) * 300_000).toISOString(); // 5 minute steps, cacheable
+    const u = new URLSearchParams({ from, limit: "8000" });
     if (species) u.set("species", species);
-    const [ev, dep, sp, ins, st] = await Promise.all([
-      fetch(`/api/v1/events?${u}`).then((r) => r.json() as Promise<FC>),
-      fetch(`/api/v1/deployments`).then((r) => r.json() as Promise<FC>),
-      fetch(`/api/v1/species?hours=${hours}`).then((r) => r.json() as Promise<Species[]>),
-      fetch(`/api/v1/insights`).then((r) => r.json() as Promise<Insights>),
-      fetch(`/api/v1/status`).then((r) => r.json() as Promise<Status>),
-    ]);
-    setEvents(ev); setDeployments(dep); setSpeciesList(sp); setInsights(ins); setStatus(st); setFetchedAt(Date.now()); setLoading(false);
-    const names = [...new Set([...ins.drift, ...ins.movers, ...ins.arrivals].map((x) => x.scientificName).concat(sp.slice(0, 15).map((x) => x.scientificName), ev.features.slice(0, 40).map((f) => String(f.properties.sci))))];
-    const missing = names.filter((n) => n && n !== "null" && !(n in thumbsRef.current)).slice(0, 40);
-    if (missing.length) {
-      const m = (await fetch(`/api/v1/media?names=${encodeURIComponent(missing.join(","))}`).then((r) => r.json())) as Record<string, { thumbUrl: string | null }>;
-      setThumbs((t) => { const next = { ...t }; for (const n of missing) next[n] = m[n]?.thumbUrl ?? null; thumbsRef.current = next; return next; });
-    }
+    const wantThumbs = (names: string[]) => {
+      const missing = [...new Set(names)].filter((n) => n && n !== "null" && !(n in thumbsRef.current)).slice(0, 40);
+      if (!missing.length) return;
+      for (const n of missing) thumbsRef.current[n] = null; // claimed, so parallel calls do not refetch
+      fetch(`/api/v1/media?names=${encodeURIComponent(missing.join(","))}`).then((r) => r.json()).then((m: Record<string, { thumbUrl: string | null }>) => {
+        setThumbs((t) => { const next = { ...t }; for (const n of missing) next[n] = m[n]?.thumbUrl ?? null; thumbsRef.current = { ...thumbsRef.current, ...next }; return next; });
+      }).catch(() => {});
+    };
+    const events = fetch(`/api/v1/events?${u}`).then((r) => r.json() as Promise<FC>).then((ev) => {
+      setEvents(ev); setFetchedAt(Date.now()); setLoading(false);
+      wantThumbs(ev.features.slice(0, 40).map((f) => String(f.properties.sci)));
+    });
+    const rest = [
+      fetch(`/api/v1/deployments`).then((r) => r.json() as Promise<FC>).then(setDeployments),
+      fetch(`/api/v1/species?hours=${hours}`).then((r) => r.json() as Promise<Species[]>).then((sp) => { setSpeciesList(sp); wantThumbs(sp.slice(0, 15).map((x) => x.scientificName)); }),
+      fetch(`/api/v1/insights`).then((r) => r.json() as Promise<Insights>).then((ins) => { setInsights(ins); wantThumbs([...ins.drift, ...ins.movers, ...ins.arrivals].map((x) => x.scientificName)); }),
+      fetch(`/api/v1/status`).then((r) => r.json() as Promise<Status>).then(setStatus),
+    ];
+    await Promise.allSettled([events, ...rest]);
   }, [hours, species]);
 
   useEffect(() => {
