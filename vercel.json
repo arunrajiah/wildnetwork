@@ -1,3 +1,6 @@
 {
-  "crons": [{ "path": "/api/cron/pull", "schedule": "* * * * *" }]
+  "crons": [
+    { "path": "/api/cron/pull", "schedule": "* * * * *" },
+    { "path": "/api/cron/rollup", "schedule": "15 * * * *" }
+  ]
 }
