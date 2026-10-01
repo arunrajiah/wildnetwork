@@ -1,5 +1,5 @@
 import { sql } from "@/lib/db";
-import { METHODS_VERSION, MIN_EFFORT_DAY } from "@/lib/methods";
+import { METHODS_VERSION, minEffortDay } from "@/lib/methods";
 
 export const revalidate = 600;
 
@@ -10,6 +10,8 @@ export const revalidate = 600;
 export async function GET(_req: Request, ctx: { params: Promise<{ name: string }> }) {
   const name = decodeURIComponent((await ctx.params).name);
 
+  // Effort is taken from the species' own class (a bat is measured against bat detections).
+  const [{ grp } = { grp: "avian" }] = await sql<{ grp: string }[]>`SELECT grp FROM species_group WHERE scientific_name = ${name}`;
   const [daily, cells, info] = await Promise.all([
     // Daily series over the species' range (cells where it was detected in the window), effort corrected:
     // index = detections per 1,000 detections of all species; centre = weighted by per-cell share.
@@ -23,7 +25,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
       ), ef AS (
         SELECT e.day, e.cell_lat, e.cell_lon, e.detections::float AS effort
         FROM effort_daily e JOIN range USING (cell_lat, cell_lon)
-        WHERE e.day >= CURRENT_DATE - 30 AND e.day < CURRENT_DATE AND e.detections >= ${MIN_EFFORT_DAY}
+        WHERE e.day >= CURRENT_DATE - 30 AND e.day < CURRENT_DATE AND e.grp = ${grp} AND e.detections >= ${minEffortDay()}
       )
       SELECT ef.day::text AS day, COALESCE(SUM(sp.n), 0)::int AS n, COALESCE(SUM(sp.high), 0)::int AS high,
              SUM(ef.effort)::bigint AS effort,
@@ -46,11 +48,11 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
         SELECT cell_lat, cell_lon,
                COALESCE(SUM(detections) FILTER (WHERE day >= CURRENT_DATE - 3), 0)::float AS e_recent,
                COALESCE(SUM(detections) FILTER (WHERE day < CURRENT_DATE - 7), 0)::float AS e_earlier
-        FROM effort_daily WHERE day >= CURRENT_DATE - 14 AND day < CURRENT_DATE GROUP BY 1, 2
+        FROM effort_daily WHERE day >= CURRENT_DATE - 14 AND day < CURRENT_DATE AND grp = ${grp} GROUP BY 1, 2
       )
       SELECT cell_lat, cell_lon, sp.n,
-             CASE WHEN ef.e_recent >= ${3 * MIN_EFFORT_DAY} THEN 1000 * sp.recent / ef.e_recent END AS recent,
-             CASE WHEN ef.e_earlier >= ${3 * MIN_EFFORT_DAY} THEN 1000 * sp.earlier / ef.e_earlier END AS earlier
+             CASE WHEN ef.e_recent >= ${grp === "avian" ? 600 : 90} THEN 1000 * sp.recent / ef.e_recent END AS recent,
+             CASE WHEN ef.e_earlier >= ${grp === "avian" ? 600 : 90} THEN 1000 * sp.earlier / ef.e_earlier END AS earlier
       FROM sp JOIN ef USING (cell_lat, cell_lon)
       ORDER BY sp.n DESC LIMIT 200
     `,
@@ -89,6 +91,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
     vernacularName: info[0]?.vernacular_name ?? null,
     sources: info[0]?.sources ?? [],
     methods: METHODS_VERSION,
+    group: grp,
     daily: daily.map((d) => ({ day: d.day, n: d.n, high: d.high, effort: Number(d.effort), index: Number(d.idx), lat: d.lat == null ? null : Number(d.lat), lon: d.lon == null ? null : Number(d.lon), cells: d.cells, weather: weather[String(d.day)] ?? null })),
     // recent / earlier are per-1,000 shares; null when the cell was not observed enough in that period
     cells: cells.map((c) => ({ lat: c.cell_lat, lon: c.cell_lon, n: c.n, recent: c.recent == null ? null : Number(c.recent), earlier: c.earlier == null ? null : Number(c.earlier) })),

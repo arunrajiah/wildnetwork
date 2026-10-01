@@ -44,14 +44,16 @@ export async function runConnector(c: PullConnector): Promise<RunResult> {
 
 /**
  * Storage budget: raw events are only a live window. History lives in the rollup tables.
- * BirdWeather 3 hours, other pulled sources 7 days, device pushes 30 days, daily rollups 35 days.
- * Sized for Neon's free 512 MB: about 195 MB weekly history, 150 MB daily, 65 MB live events.
+ * BirdWeather 3 hours, other pulled sources 7 days, device pushes 30 days, daily rollups 28 days.
+ * Sized for Neon's free 512 MB: about 225 MB weekly history, 125 MB daily, 15 MB live events (500 newest BirdWeather detections per pull).
  */
 export async function prune(): Promise<void> {
-  await sql`DELETE FROM events WHERE source_system = 'birdweather' AND event_start < now() - interval '3 hours'`;
+  // Bats are sparse and nocturnal, so they stay for a day; everything else from BirdWeather for 3 hours.
+  await sql`DELETE FROM events e WHERE e.source_system = 'birdweather' AND e.event_start < now() - interval '3 hours'
+    AND (e.event_start < now() - interval '24 hours' OR NOT EXISTS (SELECT 1 FROM species_group g WHERE g.scientific_name = e.scientific_name AND g.grp = 'bat'))`;
   await sql`DELETE FROM events WHERE source_system = 'inaturalist' AND event_start < now() - interval '7 days'`;
   await sql`DELETE FROM events WHERE source_system NOT IN ('birdweather', 'inaturalist') AND event_start < now() - interval '30 days'`;
-  await sql`DELETE FROM species_daily WHERE day < CURRENT_DATE - 35`;
+  await sql`DELETE FROM species_daily WHERE day < CURRENT_DATE - 28`;
 }
 
 export async function pullAll(only?: string | null): Promise<RunResult[]> {

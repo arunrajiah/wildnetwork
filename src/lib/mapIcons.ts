@@ -1,7 +1,8 @@
 import type { Map as MLMap } from "maplibre-gl";
 
 // Silhouettes from EarthRanger (Apache 2.0), see public/icons/er/NOTICE.md.
-const GROUPS = ["bird", "mammal", "amphibian", "reptile", "camera", "generic"] as const;
+// The bat silhouette is our own (public/icons/bat.svg); the rest come from EarthRanger.
+const GROUPS = ["bird", "bat", "mammal", "amphibian", "reptile", "camera", "generic"] as const;
 const SOURCES: Record<string, string> = { birdweather: "#0891b2", inaturalist: "#65a30d", wdx: "#db2777" };
 const SIZE = 64;
 
@@ -25,7 +26,7 @@ function svgToImage(svg: string): Promise<HTMLImageElement> {
 /** Registers "<group>-<source>" images: a white silhouette on a disc in the source colour. */
 export async function registerIcons(map: MLMap): Promise<void> {
   await Promise.all(GROUPS.map(async (g) => {
-    const svg = await fetch(`/icons/er/${g}.svg`).then((r) => r.text());
+    const svg = await fetch(g === "bat" ? "/icons/bat.svg" : `/icons/er/${g}.svg`).then((r) => r.text());
     const img = await svgToImage(svg);
     for (const [source, color] of Object.entries(SOURCES)) {
       const c = document.createElement("canvas");
@@ -44,7 +45,7 @@ export async function registerIcons(map: MLMap): Promise<void> {
 }
 
 export const ICON_IMAGE = ["concat",
-  ["match", ["get", "group"], "Aves", "bird", "Mammalia", "mammal", "Amphibia", "amphibian", "Reptilia", "reptile", "camera", "camera", "generic"],
+  ["match", ["get", "group"], "Aves", "bird", "bat", "bat", "Mammalia", "mammal", "Amphibia", "amphibian", "Reptilia", "reptile", "camera", "camera", "generic"],
   "-",
   ["match", ["get", "source"], "birdweather", "birdweather", "inaturalist", "inaturalist", "wdx"],
 ];

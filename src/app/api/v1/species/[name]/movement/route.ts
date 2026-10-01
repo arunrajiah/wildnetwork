@@ -1,5 +1,5 @@
 import { sql } from "@/lib/db";
-import { METHODS_VERSION, MIN_EFFORT_WEEK, REGION } from "@/lib/methods";
+import { METHODS_VERSION, REGION, minEffortWeek } from "@/lib/methods";
 
 export const revalidate = 3600;
 
@@ -10,11 +10,12 @@ export const revalidate = 3600;
  */
 export async function GET(_req: Request, ctx: { params: Promise<{ name: string }> }) {
   const name = decodeURIComponent((await ctx.params).name);
+  const [{ grp } = { grp: "avian" }] = await sql<{ grp: string }[]>`SELECT grp FROM species_group WHERE scientific_name = ${name}`;
   const rows = await sql`
     SELECT s.week::text AS week, cell_lat, cell_lon, SUM(s.count)::int AS n, e.detections::float AS effort, ${REGION} AS region
     FROM species_weekly s JOIN effort_weekly e USING (week, cell_lat, cell_lon)
     WHERE s.scientific_name = ${name} AND s.week >= CURRENT_DATE - 371 AND s.week <= CURRENT_DATE - 7
-      AND e.detections >= ${MIN_EFFORT_WEEK}
+      AND e.grp = ${grp} AND e.detections >= ${minEffortWeek()}
     GROUP BY s.week, cell_lat, cell_lon, e.detections
     ORDER BY s.week
   `;
@@ -33,6 +34,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
   return Response.json({
     scientificName: name,
     methods: METHODS_VERSION,
+    group: grp,
     frames: [...frames.values()].map((f) => ({
       week: f.week,
       total: f.total,

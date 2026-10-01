@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { METHODS_VERSION, MIN_CELL_DETECTIONS, MIN_EFFORT_DAY, MIN_EFFORT_WEEK } from "@/lib/methods";
+import { METHODS_VERSION, MIN_CELL_DETECTIONS, MIN_EFFORT_DAY, MIN_EFFORT_WEEK, SMALL_CLASS } from "@/lib/methods";
 
 export const metadata: Metadata = {
   title: "Methods · WildNetwork",
@@ -28,14 +28,14 @@ export default function Methods() {
           A <b>detection</b> is one record that a species was identified at a place and time, by a classifier or a person. WildNetwork currently holds three kinds:
         </p>
         <ul className="mt-2 list-disc pl-5 space-y-1">
-          <li><b>Acoustic detections</b> from BirdWeather community stations, identified by BirdNET. This is the large majority of the data.</li>
+          <li><b>Acoustic detections</b> from BirdWeather community stations: birds, frogs, insects and some mammals identified by BirdNET, and bats identified by BirdWeather&apos;s ultrasonic classifier. This is the large majority of the data.</li>
           <li><b>Community observations</b> from iNaturalist, limited to CC0 and CC BY records.</li>
           <li><b>Device detections</b> pushed by contributors running wdx-agent on BirdNET-Pi, BirdNET-Go or camera traps.</li>
         </ul>
         <p className="mt-3">
           Detections are not stored one by one for long. They are counted into <b>rollups</b>: the number of detections per species, per 5 degree
           latitude and longitude cell, per day and per week. A 5 degree cell is roughly 550 km north to south. All measures below are computed from these
-          rollups. The dots on the live map are a recent sample only (the newest high confidence detections from the last three hours) and are not used for
+          rollups. The dots on the live map are a sample only (the 500 newest high confidence detections every five minutes, kept for three hours; bats are kept for a day) and are not used for
           any measure.
         </p>
         <Src files={[["src/lib/rollups.ts", "rollups"], ["src/lib/connectors", "connectors"]]} />
@@ -60,6 +60,27 @@ export default function Methods() {
           It does not make detections equal to animals, see the limits below.
         </p>
         <Src files={[["drizzle/0006_effort.sql", "effort tables"], ["src/lib/methods.ts", "thresholds"]]} />
+
+        <H3><span id="classes" className="scroll-mt-6">Classes: birds, bats, frogs, insects, mammals</span></H3>
+        <p>
+          Effort is corrected <b>within a class</b>. Each species belongs to one of birds, bats, amphibians, insects or mammals (as labelled by BirdWeather),
+          and its share is taken of the detections of that class only.
+        </p>
+        <Formula>share(bat species, cell, period) = detections of the species ÷ detections of all bats</Formula>
+        <p>
+          This matters most for bats. Bat calls are ultrasonic and are only recorded by stations with an ultrasonic microphone, about 800 of some 25,000.
+          A bat&apos;s share of <i>all</i> detections would mostly measure how many of the local stations can hear bats. Measured against other bats, it
+          describes the bat community at the stations that can.
+        </p>
+        <p className="mt-3">
+          Classes other than birds have far fewer sensors and detections, so their minimums are lower: a cell counts as observed with {SMALL_CLASS.MIN_EFFORT_DAY}{" "}
+          detections of that class in a day or {SMALL_CLASS.MIN_EFFORT_WEEK} in a week, and count thresholds in the measures below are a fifth of those for birds.
+          Results for these classes rest on little data and should be read as early signals.
+        </p>
+        <p className="mt-3">
+          Many bat calls cannot be identified to species and are reported at a higher level: &quot;Bats&quot; (order), &quot;Vesper Bats&quot; (family) or a genus such as
+          <i> Myotis</i>. These count toward bat effort, and can be looked up, but are left out of the movement lists and arrival dates, which are for species only.
+        </p>
 
         <H2 id="measures">3. Measures</H2>
 
@@ -162,9 +183,10 @@ export default function Methods() {
           <li><b>Shares are relative.</b> If another species becomes much more vocal, every other share in that cell falls, even if nothing else changed. Seasonal changes in singing (birds call more in spring) change detection rates without any movement.</li>
           <li><b>Coarse cells.</b> At 5 degrees, movements shorter than a few hundred kilometres are invisible, and a range centre is a summary, not a route.</li>
           <li><b>Thresholds are judgement calls.</b> The minimums on this page were chosen to suppress obvious noise, not derived from a model. They are published so they can be challenged.</li>
+          <li><b>Bats are harder than birds.</b> About two thirds of bat detections are identified only to genus, family or order. Species level bat identification from calls is uncertain even for experts, coverage is limited to a few dozen cells, and bat detection scores are on a different scale from bird scores. Nothing about bats has been validated yet. For temperate bats, a seasonal &quot;arrival&quot; is likely emergence from hibernation, not migration.</li>
           <li><b>Acoustic onset is not always arrival.</b> For a resident species the first sustained detections mark the start of singing, not movement. For species that are quiet when they arrive (hummingbirds are the clearest case) the acoustic arrival date can be two to three months late.</li>
           <li><b>No uncertainty yet.</b> Measures are reported without confidence intervals.</li>
-          <li><b>Short history.</b> Daily rollups cover about five weeks; weekly rollups go back up to a year but with fewer stations in earlier months.</li>
+          <li><b>Short history.</b> Daily rollups cover four weeks; weekly rollups go back up to a year but with fewer stations in earlier months.</li>
           <li><b>Weather is a single point.</b> Conditions at the range centre do not describe what a migrating bird experienced along its way, and a correlation over a few weeks is not evidence of cause.</li>
           <li><b>Mixed sources.</b> Acoustic detections and human observations are counted together in effort. Human observations are a very small fraction today.</li>
         </ol>
@@ -187,6 +209,7 @@ export default function Methods() {
 
         <H2 id="changes">7. Changes</H2>
         <ul className="mt-2 list-disc pl-5 space-y-1">
+          <li><b>0.4</b> (1 October 2026): taxon classes. Bats, amphibians, insects and mammals are labelled and effort corrected within their own class; higher level identifications are excluded from species measures.</li>
           <li><b>0.3</b> (1 October 2026): arrival, peak and departure weeks per species and cell, with a first validation against iNaturalist.</li>
           <li><b>0.2</b> (1 October 2026): effort correction. All measures use share of detections; range centres use only cells observed in both periods; arrivals require a watched cell.</li>
           <li><b>0.1</b> (1 October 2026): first release, raw counts. Superseded because raw counts track station numbers.</li>

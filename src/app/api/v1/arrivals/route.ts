@@ -12,11 +12,13 @@ export const revalidate = 3600;
 export async function GET(req: Request) {
   const p = new URL(req.url).searchParams;
   const species = p.get("species");
+  const group = p.get("group");
   const rows = await sql`
     SELECT scientific_name, vernacular_name, cell_lat, cell_lon, ${REGION} AS region,
            arrival_week::text, peak_week::text, departure_week::text, peak_index, total_n, weeks_observed, absent_weeks
     FROM phenology
     ${species ? sql`WHERE scientific_name = ${species}` : sql`WHERE arrival_week >= CURRENT_DATE - 28`}
+    ${group ? sql`AND scientific_name IN (SELECT scientific_name FROM species_group WHERE grp = ${group})` : sql``}
     ORDER BY ${species ? sql`cell_lat DESC, cell_lon` : sql`arrival_week DESC, total_n DESC`}
     LIMIT ${species ? 500 : 200}
   `;

@@ -22,6 +22,11 @@ interface Insights {
 interface Movement { scientificName: string; frames: { week: string; total: number; index: number; cells: [number, number, number, number][]; centroids: { region: string; n: number; lat: number; lon: number }[] }[] }
 interface Status { live: boolean; lastPullAt: string | null; events1h: number; sensors: number; detections: number; species: number }
 
+const CLASSES: { key: string; label: string }[] = [
+  { key: "all", label: "All" }, { key: "avian", label: "Birds" }, { key: "bat", label: "Bats" },
+  { key: "amphibian", label: "Frogs" }, { key: "insect", label: "Insects" }, { key: "mammal", label: "Mammals" },
+];
+
 const EMPTY: FC = { type: "FeatureCollection", features: [] };
 const STYLE = "https://tiles.openfreemap.org/styles/dark";
 const HOURS = [1, 3]; // the live window; longer history is in the weekly movement playback
@@ -46,6 +51,7 @@ export default function WorldMap() {
   const [thumbs, setThumbs] = useState<Record<string, string | null>>({});
   const [tab, setTab] = useState<"now" | "feed" | "about" | null>("now");
   const [loading, setLoading] = useState(true);
+  const [group, setGroup] = useState("all");
   const [results, setResults] = useState<Species[]>([]);
   // Search has its own debounced request, so typing does not reload the map.
   useEffect(() => {
@@ -62,7 +68,8 @@ export default function WorldMap() {
   const [mvPlaying, setMvPlaying] = useState(false);
 
   const thumbsRef = useRef<Record<string, string | null>>({});
-  const windowStart = useMemo(() => fetchedAt - hours * 3600_000, [fetchedAt, hours]);
+  const liveHours = group === "bat" && !species ? 24 : hours; // the bat layer covers a day
+  const windowStart = useMemo(() => fetchedAt - liveHours * 3600_000, [fetchedAt, liveHours]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -130,9 +137,12 @@ export default function WorldMap() {
 
   // Each request paints as soon as it arrives; the map never waits for the slowest one.
   const load = useCallback(async () => {
-    const from = new Date(Math.floor((Date.now() - hours * 3600_000) / 300_000) * 300_000).toISOString(); // 5 minute steps, cacheable
-    const u = new URLSearchParams({ from, limit: "8000" });
+    const windowHours = group === "bat" && !species ? 24 : hours; // bats are sparse and nocturnal, so their live window is a day
+    const from = new Date(Math.floor((Date.now() - windowHours * 3600_000) / 300_000) * 300_000).toISOString(); // 5 minute steps, cacheable
+    const u = new URLSearchParams({ from, limit: "20000" });
     if (species) u.set("species", species);
+    else if (group !== "all") u.set("group", group);
+    const gq = group !== "all" ? `group=${group}` : "";
     const wantThumbs = (names: string[]) => {
       const missing = [...new Set(names)].filter((n) => n && n !== "null" && !(n in thumbsRef.current)).slice(0, 40);
       if (!missing.length) return;
@@ -147,12 +157,12 @@ export default function WorldMap() {
     });
     const rest = [
       fetch(`/api/v1/deployments`).then((r) => r.json() as Promise<FC>).then(setDeployments),
-      fetch(`/api/v1/species?hours=${hours}`).then((r) => r.json() as Promise<Species[]>).then((sp) => { setSpeciesList(sp); wantThumbs(sp.slice(0, 15).map((x) => x.scientificName)); }),
-      fetch(`/api/v1/insights`).then((r) => r.json() as Promise<Insights>).then((ins) => { setInsights(ins); wantThumbs([...ins.drift, ...ins.movers, ...ins.arrivals].map((x) => x.scientificName)); }),
+      fetch(`/api/v1/species?hours=${group === "bat" ? 24 : hours}${gq ? "&" + gq : ""}`).then((r) => r.json() as Promise<Species[]>).then((sp) => { setSpeciesList(sp); wantThumbs(sp.slice(0, 15).map((x) => x.scientificName)); }),
+      fetch(`/api/v1/insights${gq ? "?" + gq : ""}`).then((r) => r.json() as Promise<Insights>).then((ins) => { setInsights(ins); wantThumbs([...ins.drift, ...ins.movers, ...ins.arrivals].map((x) => x.scientificName)); }),
       fetch(`/api/v1/status`).then((r) => r.json() as Promise<Status>).then(setStatus),
     ];
     await Promise.allSettled([events, ...rest]);
-  }, [hours, species]);
+  }, [hours, species, group]);
 
   useEffect(() => {
     const t0 = setTimeout(load, 0);
@@ -247,18 +257,18 @@ export default function WorldMap() {
     let fc = events;
     if (playhead !== null) {
       const cutoff = windowStart + playhead;
-      const trail = Math.max(hours * 3600_000 * 0.05, 15 * 60_000);
+      const trail = Math.max(liveHours * 3600_000 * 0.05, 15 * 60_000);
       fc = { ...events, features: events.features.filter((f) => { const t = Date.parse(String(f.properties.t)); return t <= cutoff && t > cutoff - trail; }) };
     }
     (map.getSource("events") as GeoJSONSource)?.setData(fc);
-  }, [events, deployments, cells, species, playhead, ready, windowStart, hours, activeFrame, frames, frame, shareScale]);
+  }, [events, deployments, cells, species, playhead, ready, windowStart, liveHours, activeFrame, frames, frame, shareScale]);
 
   useEffect(() => {
     if (!playing) return;
-    const total = hours * 3600_000;
+    const total = liveHours * 3600_000;
     const id = setInterval(() => setPlayhead((p) => { const n = (p ?? 0) + total / 300; return n >= total ? 0 : n; }), 50);
     return () => clearInterval(id);
-  }, [playing, hours]);
+  }, [playing, liveHours]);
 
   const panelOpenNow = tab !== null || species !== null;
   useEffect(() => {
@@ -279,7 +289,7 @@ export default function WorldMap() {
     return () => clearInterval(id);
   }, [mvPlaying, frames.length]);
 
-  const total = hours * 3600_000;
+  const total = liveHours * 3600_000;
   const selectSpecies = (name: string | null) => {
     setSpecies(name); setPlayhead(null); setPlaying(false); setFrame(null); setMvPlaying(false);
     setEvents(EMPTY); setLoading(true);
@@ -305,6 +315,18 @@ export default function WorldMap() {
           {status?.live ? "Live" : "Stale"}{status?.lastPullAt && <span className="hidden sm:inline"> · updated {relTime(status.lastPullAt)}</span>}
         </span>
         <div className="flex-1" />
+        <div className="hidden lg:flex items-center gap-1" role="group" aria-label="Animal class">
+          {CLASSES.map((c) => (
+            <button key={c.key} onClick={() => { setGroup(c.key); selectSpecies(null); if (tab === null) setTab("now"); }}
+              className={`text-xs rounded px-2 py-1 ${group === c.key ? "bg-white/90 text-slate-900 font-medium" : "text-slate-300 hover:bg-white/10"}`}>
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <select value={group} onChange={(e) => { setGroup(e.target.value); selectSpecies(null); }} aria-label="Animal class"
+          className="lg:hidden rounded-md bg-white/10 px-2 py-1 text-sm outline-none">
+          {CLASSES.map((c) => <option key={c.key} value={c.key} className="text-slate-900">{c.label}</option>)}
+        </select>
         <div className="relative w-64 max-w-[40vw]">
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search a species"
             className="w-full rounded-md bg-white/10 px-2.5 py-1 text-sm outline-none focus:bg-white/15 placeholder:text-slate-500" />
@@ -368,6 +390,12 @@ export default function WorldMap() {
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4">
+              {group !== "all" && group !== "avian" && (
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  {CLASSES.find((c) => c.key === group)?.label} are measured against other {CLASSES.find((c) => c.key === group)?.label.toLowerCase()} only, from the stations able to detect them.
+                  Coverage is thin, so treat these as early signals. <Link href="/methods#classes" className="text-cyan-500 hover:underline">How this works</Link>.
+                </p>
+              )}
               <Section title="Moving" hint="Range centre shift per continent, effort corrected">
                 {insights?.drift.map((d) => (
                   <Row key={d.scientificName + d.region} thumb={thumbs[d.scientificName]} onClick={() => pick(d.scientificName)} name={d.vernacularName ?? d.scientificName} sci={`${d.scientificName} · ${d.region}`}
@@ -386,7 +414,7 @@ export default function WorldMap() {
                     value={`${a.cellLat}°, ${a.cellLon}°`} tone="neutral" />
                 ))}
               </Section>
-              <Section title="Most detected" hint={`Last ${hours < 24 ? hours + "h" : hours / 24 + "d"}`}>
+              <Section title="Most detected" hint={group === "bat" ? "Last 24h" : `Last ${hours}h`}>
                 {speciesList.slice(0, 15).map((s) => (
                   <Row key={s.scientificName} thumb={thumbs[s.scientificName]} onClick={() => pick(s.scientificName)} name={s.vernacularName ?? s.scientificName} sci={s.scientificName} value={s.count.toLocaleString()} tone="neutral" />
                 ))}
@@ -415,7 +443,7 @@ export default function WorldMap() {
           </>
         ) : (
           <>
-            <div className="text-slate-400 mb-1">Detections, last {hours}h (sample)</div>
+            <div className="text-slate-400 mb-1">{group === "bat" ? "Bat detections, last 24h" : `Detections, last ${hours}h (sample)`}</div>
             <div className="flex flex-wrap gap-x-3 gap-y-0.5"><Legend color="#0891b2" label="BirdWeather" /><Legend color="#65a30d" label="iNaturalist" /><Legend color="#db2777" label="Devices" /><Legend color="#475569" label="Sensor" /></div>
           </>
         )}

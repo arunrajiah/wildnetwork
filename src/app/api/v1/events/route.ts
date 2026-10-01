@@ -39,7 +39,7 @@ export async function POST(req: Request) {
 
 /**
  * Query events for the map.
- * ?bbox=w,s,e,n  ?from=ISO ?to=ISO ?species=Scientific+name ?source=birdweather ?minConfidence=0.7 ?limit=5000
+ * ?bbox=w,s,e,n  ?from=ISO ?to=ISO ?species=Scientific+name ?source=birdweather ?group=bat ?minConfidence=0.7 ?limit=5000
  */
 export async function GET(req: Request) {
   const p = new URL(req.url).searchParams;
@@ -49,6 +49,7 @@ export async function GET(req: Request) {
   const from = p.get("from") ? new Date(p.get("from")!) : new Date(to.getTime() - 24 * 3600 * 1000);
   const species = p.get("species");
   const source = p.get("source");
+  const group = p.get("group");
   const minConf = Number(p.get("minConfidence") ?? 0);
   const bbox = p.get("bbox")?.split(",").map(Number);
   const hasBbox = bbox?.length === 4 && bbox.every((n) => Number.isFinite(n));
@@ -57,13 +58,16 @@ export async function GET(req: Request) {
     SELECT e.event_id, e.event_start, e.scientific_name, e.vernacular_name, e.confidence,
            e.latitude, e.longitude, e.source_system, e.deployment_id, e.media_url, e.media_type, e.review_status,
            CASE WHEN e.media_type IN ('image', 'video') AND e.source_system NOT IN ('inaturalist') THEN 'camera'
+                WHEN g.grp = 'bat' THEN 'bat' WHEN g.grp = 'avian' THEN 'Aves' WHEN g.grp = 'amphibian' THEN 'Amphibia' WHEN g.grp = 'insect' THEN 'Insecta' WHEN g.grp = 'mammal' THEN 'Mammalia'
                 ELSE COALESCE(NULLIF(m.iconic, 'Unknown'), CASE WHEN e.source_system = 'birdweather' THEN 'Aves' END, 'Unknown') END AS grp
     FROM events e LEFT JOIN species_media m ON m.scientific_name = e.scientific_name
+    LEFT JOIN species_group g ON g.scientific_name = e.scientific_name
     WHERE event_start >= ${from} AND event_start <= ${to}
       AND confidence >= ${minConf}
       AND review_status <> 'rejected'
       ${species ? sql`AND e.scientific_name = ${species}` : sql``}
       ${source ? sql`AND source_system = ${source}` : sql``}
+      ${group ? sql`AND g.grp = ${group}` : sql``}
       ${hasBbox ? sql`AND geom && ST_MakeEnvelope(${bbox![0]}, ${bbox![1]}, ${bbox![2]}, ${bbox![3]}, 4326)::geography` : sql``}
     ORDER BY event_start DESC
     LIMIT ${limit}

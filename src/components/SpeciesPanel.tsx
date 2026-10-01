@@ -8,6 +8,7 @@ export interface SpeciesDetail {
   vernacularName: string | null;
   sources: string[];
   methods?: string;
+  group?: string;
   daily: { day: string; n: number; high: number | null; effort: number; index: number; lat: number | null; lon: number | null; cells: number; weather: { tmax: number | null; tmin: number | null; precip: number | null; wind: number | null; windDir: number | null } | null }[];
   cells: { lat: number; lon: number; n: number; recent: number | null; earlier: number | null }[];
 }
@@ -46,6 +47,8 @@ function Line({ values, labels, format, color, title }: { values: (number | null
     </div>
   );
 }
+
+const CLASS_NOUN: Record<string, string> = { avian: "", bat: "bat", amphibian: "frog", insect: "insect", mammal: "mammal", other: "other" };
 
 interface Arrival { cellLat: number; cellLon: number; region: string; arrivalWeek: string; peakWeek: string; departureWeek: string | null; detections: number }
 interface Media { title: string | null; thumbUrl: string | null; imageUrl: string | null; extract: string | null; pageUrl: string | null; source: string; attribution: string | null; license: string | null }
@@ -99,13 +102,13 @@ export default function SpeciesPanel({ name, onClose }: { name: string; onClose:
         <Stat label="Range centre drift" value={drift == null ? "n/a" : `${Math.abs(drift).toFixed(1)}° ${drift > 0 ? "north" : "south"}`} />
         <Stat label="Frequency vs max temp" value={corr == null ? "n/a" : `r = ${corr.toFixed(2)}`} />
       </dl>
-      <Line title="Relative frequency (per 1,000)" values={days.map((d) => d.index)} labels={labels} format={(v) => (v >= 10 ? v.toFixed(0) : v >= 1 ? v.toFixed(1) : v.toFixed(2))} color="#22d3ee" />
+      <Line title={`Relative frequency (per 1,000${CLASS_NOUN[data.group ?? "avian"] ? " " + CLASS_NOUN[data.group ?? "avian"] : ""})`} values={days.map((d) => d.index)} labels={labels} format={(v) => (v >= 10 ? v.toFixed(0) : v >= 1 ? v.toFixed(1) : v.toFixed(2))} color="#22d3ee" />
       <Line title="Range centre latitude" values={days.map((d) => d.lat)} labels={labels} format={(v) => `${v.toFixed(1)}°`} color="#a78bfa" />
       <Line title="Max temperature at range centre (°C)" values={days.map((d) => d.weather?.tmax ?? null)} labels={labels} format={(v) => `${v.toFixed(0)}°`} color="#fb923c" />
       <Line title="Max wind at range centre (km/h)" values={days.map((d) => d.weather?.wind ?? null)} labels={labels} format={(v) => `${v.toFixed(0)}`} color="#94a3b8" />
       <ArrivalTable rows={arrivals?.name === name ? arrivals.rows : null} name={name} />
       <p className="text-[11px] text-slate-500 pb-4">
-        Effort corrected: figures are the species&apos; share of all detections, so more stations do not look like more birds.{" "}
+        Effort corrected: figures are the species&apos; share of all {CLASS_NOUN[data.group ?? "avian"] || "bird"} detections, so more stations do not look like more animals.{" "}
         <Link href="/methods" className="text-cyan-500 hover:underline">How this is measured, and its limits</Link>.
         Sources: {data.sources.join(", ")}. Weather: Open-Meteo ERA5 at the range centre. Map squares show the change in share, last 3 days against the week before.
         {media?.attribution && <> Photo: {media.attribution} ({media.license}).</>}

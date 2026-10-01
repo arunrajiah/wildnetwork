@@ -3,18 +3,18 @@ import type { PullConnector } from "./types";
 
 const ENDPOINT = "https://app.birdweather.com/graphql";
 const PAGE = 500;
-const MAX_PAGES = 6; // 3,000 events per run: the live layer is a sample, history comes from rollups
+const MAX_PAGES = 1; // 500 newest per pull: an even sample over time (about 6,000 an hour). History comes from rollups.
 const MIN_CONFIDENCE = 0.8;
 
 const QUERY = `
-query Pull($from: ISO8601Date!, $to: ISO8601Date!, $after: String, $first: Int!, $conf: Float!) {
-  detections(period: {from: $from, to: $to}, after: $after, first: $first, confidenceGte: $conf, sortBy: "timestamp_desc") {
+query Pull($from: ISO8601Date!, $to: ISO8601Date!, $after: String, $first: Int!, $conf: Float!, $classes: [String!]) {
+  detections(period: {from: $from, to: $to}, after: $after, first: $first, confidenceGte: $conf, classifications: $classes, sortBy: "timestamp_desc") {
     pageInfo { hasNextPage endCursor }
     nodes {
       id timestamp confidence probability
       coords { lat lon }
       soundscape { url }
-      species { id commonName scientificName ebirdCode }
+      species { id commonName scientificName ebirdCode classification }
       station { id name type locationPrivacy locationPrivacyRadius coords { lat lon } }
     }
   }
@@ -27,7 +27,7 @@ interface Node {
   probability: number | null;
   coords: { lat: number; lon: number } | null;
   soundscape: { url: string } | null;
-  species: { id: string; commonName: string; scientificName: string; ebirdCode: string | null };
+  species: { id: string; commonName: string; scientificName: string; ebirdCode: string | null; classification: string | null };
   station: {
     id: string;
     name: string;
@@ -57,10 +57,10 @@ function toWdx(n: Node): WdxEvent | null {
     detection: {
       scientificName: n.species.scientificName,
       vernacularName: n.species.commonName,
-      taxonRank: "species",
       taxonId: n.species.ebirdCode ? `ebird:${n.species.ebirdCode}` : undefined,
-      confidence: n.confidence,
-      classifier: { name: "BirdNET", version: "unknown" },
+      confidence: Math.min(1, Math.max(0, n.confidence)), // bat scores can exceed 1; WDX requires 0 to 1
+      taxonRank: n.species.scientificName.includes(" ") ? "species" : "unranked",
+      classifier: { name: n.species.classification === "bat" ? "BirdWeather bat classifier" : "BirdNET", version: "unknown" },
     },
     media: n.soundscape?.url ? { mediaType: "audio", url: n.soundscape.url } : undefined,
     review: { status: "unreviewed" },
@@ -78,29 +78,33 @@ export const birdweather: PullConnector = {
     const to = now.toISOString();
 
     const events: WdxEvent[] = [];
-    let after: string | null = null;
     let last = cursor;
-    for (let page = 0; page < MAX_PAGES; page++) {
-      const res = await fetch(ENDPOINT, {
-        method: "POST",
-        headers: { "content-type": "application/json", "user-agent": "wildnetwork/0.1 (+https://github.com/arunrajiah)" },
-        body: JSON.stringify({ query: QUERY, variables: { from, to, after, first: PAGE, conf: MIN_CONFIDENCE } }),
-      });
-      if (!res.ok) throw new Error(`birdweather ${res.status}: ${(await res.text()).slice(0, 200)}`);
-      const json = (await res.json()) as {
-        data?: { detections: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: Node[] } };
-        errors?: { message: string }[];
-      };
-      if (json.errors?.length) throw new Error(`birdweather graphql: ${json.errors[0].message}`);
-      const d = json.data!.detections;
-      for (const n of d.nodes) {
-        const ev = toWdx(n);
-        if (ev) events.push(ev);
-        // Timestamps carry different UTC offsets, so compare instants, not strings.
-        if (!last || Date.parse(n.timestamp) > Date.parse(last)) last = new Date(n.timestamp).toISOString();
+    // Two passes: the newest detections of any class, then bats on their own.
+    // Bats are about 0.2% of the stream, so the first pass alone would almost never show one.
+    for (const pass of [{ classes: null as string[] | null, pages: MAX_PAGES }, { classes: ["bat"], pages: 2 }]) {
+      let after: string | null = null;
+      for (let page = 0; page < pass.pages; page++) {
+        const res = await fetch(ENDPOINT, {
+          method: "POST",
+          headers: { "content-type": "application/json", "user-agent": "wildnetwork/0.1 (+https://github.com/arunrajiah)" },
+          body: JSON.stringify({ query: QUERY, variables: { from, to, after, first: PAGE, conf: MIN_CONFIDENCE, classes: pass.classes } }),
+        });
+        if (!res.ok) throw new Error(`birdweather ${res.status}: ${(await res.text()).slice(0, 200)}`);
+        const json = (await res.json()) as {
+          data?: { detections: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: Node[] } };
+          errors?: { message: string }[];
+        };
+        if (json.errors?.length) throw new Error(`birdweather graphql: ${json.errors[0].message}`);
+        const d = json.data!.detections;
+        for (const n of d.nodes) {
+          const ev = toWdx(n);
+          if (ev) events.push(ev);
+          // Timestamps carry different UTC offsets, so compare instants, not strings.
+          if (!last || Date.parse(n.timestamp) > Date.parse(last)) last = new Date(n.timestamp).toISOString();
+        }
+        if (!d.pageInfo.hasNextPage) break;
+        after = d.pageInfo.endCursor;
       }
-      if (!d.pageInfo.hasNextPage) break;
-      after = d.pageInfo.endCursor;
     }
     return { events, cursor: last ?? to };
   },

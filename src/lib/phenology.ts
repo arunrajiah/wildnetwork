@@ -1,5 +1,5 @@
 import { sql } from "@/lib/db";
-import { METHODS_VERSION, MIN_EFFORT_WEEK } from "@/lib/methods";
+import { METHODS_VERSION, SMALL_CLASS, minEffortWeek } from "@/lib/methods";
 
 export interface WeekPoint { week: string; value: number; n: number }
 export interface Season { arrival: string; departure: string | null; peak: string; peakValue: number; total: number; weeks: number; absentWeeks: number }
@@ -62,39 +62,42 @@ export function detectSeason(series: WeekPoint[], limits = PHENOLOGY): Season | 
 
 /** Recompute the phenology table from species_weekly and effort_weekly. Streams rows, so memory stays small. */
 export async function recomputePhenology(): Promise<{ pairs: number; seasons: number }> {
-  const effort = new Map<string, Map<string, number>>(); // cell -> week -> detections
-  for (const e of await sql<{ week: string; cell_lat: number; cell_lon: number; detections: number }[]>`
-    SELECT week::text, cell_lat, cell_lon, detections FROM effort_weekly
-    WHERE detections >= ${MIN_EFFORT_WEEK} AND week <= CURRENT_DATE - 7 ORDER BY week`) {
-    const k = `${e.cell_lat},${e.cell_lon}`;
+  const effort = new Map<string, Map<string, number>>(); // class|cell -> week -> detections
+  for (const e of await sql<{ week: string; cell_lat: number; cell_lon: number; grp: string; detections: number }[]>`
+    SELECT e.week::text, e.cell_lat, e.cell_lon, e.grp, e.detections FROM effort_weekly e
+    WHERE e.detections >= ${minEffortWeek()} AND e.week <= CURRENT_DATE - 7 ORDER BY e.week`) {
+    const k = `${e.grp}|${e.cell_lat},${e.cell_lon}`;
     if (!effort.has(k)) effort.set(k, new Map());
     effort.get(k)!.set(e.week, e.detections);
   }
 
   const out: Record<string, unknown>[] = [];
   let pairs = 0;
-  let key = "", name = "", vern: string | null = null, cell = "", counts = new Map<string, number>();
+  let key = "", name = "", vern: string | null = null, cell = "", grp = "avian", counts = new Map<string, number>();
+  // Classes with few sensors need lower minimums, scaled the same way as the other measures.
+  const small = { ...PHENOLOGY, MIN_TOTAL: Math.ceil(PHENOLOGY.MIN_TOTAL * SMALL_CLASS.SCALE), MIN_PEAK_N: Math.ceil(PHENOLOGY.MIN_PEAK_N * SMALL_CLASS.SCALE), MIN_WEEKS_OBSERVED: 16 };
   const flush = () => {
     if (!key) return;
     pairs++;
-    const weeks = effort.get(cell);
+    const weeks = effort.get(`${grp}|${cell}`);
     if (!weeks) return;
     const series: WeekPoint[] = [...weeks.entries()].map(([week, eff]) => { const n = counts.get(week) ?? 0; return { week, n, value: (1000 * n) / eff }; });
-    const s = detectSeason(series);
+    const s = detectSeason(series, grp === "avian" ? PHENOLOGY : small);
     if (!s) return;
     const [lat, lon] = cell.split(",").map(Number);
     out.push({ scientific_name: name, vernacular_name: vern, cell_lat: lat, cell_lon: lon, arrival_week: s.arrival, departure_week: s.departure, peak_week: s.peak,
       peak_index: s.peakValue, total_n: s.total, weeks_observed: s.weeks, absent_weeks: s.absentWeeks, methods_version: METHODS_VERSION });
   };
-  await sql<{ scientific_name: string; vernacular_name: string | null; cell_lat: number; cell_lon: number; week: string; n: number }[]>`
-    SELECT scientific_name, MIN(vernacular_name) AS vernacular_name, cell_lat, cell_lon, week::text, SUM(count)::int AS n
-    FROM species_weekly WHERE week <= CURRENT_DATE - 7
-    GROUP BY scientific_name, cell_lat, cell_lon, week
-    ORDER BY scientific_name, cell_lat, cell_lon, week
+  await sql<{ scientific_name: string; vernacular_name: string | null; grp: string; cell_lat: number; cell_lon: number; week: string; n: number }[]>`
+    SELECT s.scientific_name, MIN(s.vernacular_name) AS vernacular_name, g.grp, s.cell_lat, s.cell_lon, s.week::text, SUM(s.count)::int AS n
+    FROM species_weekly s JOIN species_group g USING (scientific_name)
+    WHERE s.week <= CURRENT_DATE - 7 AND g.is_species
+    GROUP BY s.scientific_name, g.grp, s.cell_lat, s.cell_lon, s.week
+    ORDER BY s.scientific_name, s.cell_lat, s.cell_lon, s.week
   `.cursor(20000, (rows) => {
     for (const r of rows) {
       const k = `${r.scientific_name}|${r.cell_lat},${r.cell_lon}`;
-      if (k !== key) { flush(); key = k; name = r.scientific_name; vern = r.vernacular_name; cell = `${r.cell_lat},${r.cell_lon}`; counts = new Map(); }
+      if (k !== key) { flush(); key = k; name = r.scientific_name; vern = r.vernacular_name; grp = r.grp; cell = `${r.cell_lat},${r.cell_lon}`; counts = new Map(); }
       counts.set(r.week, r.n);
     }
   });

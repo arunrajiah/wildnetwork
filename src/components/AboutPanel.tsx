@@ -24,7 +24,7 @@ export default function AboutPanel() {
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Data</h3>
         <ul className="flex flex-col gap-1.5">
-          <li><Link href="https://www.birdweather.com">BirdWeather</Link>: live BirdNET acoustic detections from thousands of community stations worldwide.</li>
+          <li><Link href="https://www.birdweather.com">BirdWeather</Link>: live acoustic detections from thousands of community stations worldwide. Birds, frogs and insects through BirdNET, and bats from stations with ultrasonic microphones.</li>
           <li><Link href="https://www.inaturalist.org">iNaturalist</Link>: community observations, CC0 and CC BY licensed records only, credited to their observers.</li>
           <li><Link href="https://open-meteo.com">Open-Meteo</Link>: ERA5 reanalysis weather (CC BY 4.0).</li>
           <li><Link href="https://www.wikipedia.org">Wikipedia</Link> and Wikimedia Commons contributors: species photos and descriptions (CC BY-SA).</li>

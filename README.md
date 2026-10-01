@@ -27,6 +27,7 @@ It is free, open source, and built so that anyone with a Raspberry Pi can contri
 ## What you can do with it
 
 - **See what is happening now.** A live map of detections from thousands of sensors, with a feed of the latest events.
+- **Birds, bats, frogs, insects and mammals.** Switch class in the top bar. Each class is measured against its own kind, so bats are compared with bats from the stations that can hear them.
 - **See what is changing.** Species moving north or south (per continent), species surging or fading against their weekly average, and first arrivals in a region.
 - **Follow one species.** Daily counts, the drift of its range centre, temperature and wind where it is, and a week by week playback of its movement across a year.
 - **Add your own sensor.** One command on a Raspberry Pi.
@@ -104,6 +105,7 @@ All read endpoints are public and need no key.
 | `GET /api/v1/species/{scientific name}` | 30 day series, range centre, weather |
 | `GET /api/v1/species/{scientific name}/movement` | Weekly frames for the past year |
 | `GET /api/v1/arrivals?species=&format=csv` | Arrival, peak and departure week per species and cell ([validated](https://wildnetwork.arunrajiah.com/validation)) |
+| `?group=bat` on events, species, insights, arrivals | Limit to one class: `avian`, `bat`, `amphibian`, `insect`, `mammal` |
 | `GET /api/v1/insights` | Moving, surging, fading, arriving (effort corrected, with the methods version) |
 | `GET /api/v1/media?names=A,B` | Species photo and description with attribution |
 | `GET /api/v1/status` | Freshness and totals |
@@ -198,7 +200,8 @@ Contributions are welcome: new connectors, better movement analysis, design, doc
 - Species level alerts: first arrival of the season, unusual movement nights
 - Context layers for long term analysis: land use, agriculture and climate indicators
 - Per station pages for contributors
-- wdx-agent sources: Frigate, MegaDetector, Animl, BirdNET-Go v2
+- wdx-agent sources: Frigate, MegaDetector, Animl, BirdNET-Go v2, and bat detectors (BatDetect2, AudioMoth workflows)
+- More bat data: NABat and national bat monitoring schemes, by agreement
 
 ## Credits
 

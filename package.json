@@ -14,7 +14,8 @@
     "postinstall": "mkdir -p public/maplibre && cp node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs public/maplibre/ && mkdir -p public/agent && cp agent/wdx_agent.py agent/install.sh agent/wdx-agent.service public/agent/",
     "backfill": "tsx --env-file=.env.local scripts/backfill.mts",
     "backfill:weekly": "tsx --env-file=.env.local scripts/backfill-weekly.mts",
-    "phenology": "tsx --env-file=.env.local scripts/phenology.mts"
+    "phenology": "tsx --env-file=.env.local scripts/phenology.mts",
+    "classify": "tsx --env-file=.env.local scripts/classify.mts"
   },
   "dependencies": {
     "ajv": "^8.20.0",

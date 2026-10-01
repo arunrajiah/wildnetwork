@@ -5,6 +5,7 @@ export async function GET(req: Request) {
   const p = new URL(req.url).searchParams;
   const hours = Math.min(Number(p.get("hours") ?? 24), 24 * 30);
   const q = p.get("q");
+  const group = p.get("group");
   // A search looks through every species in the daily history, not only what was heard in the live window.
   const rows = q
     ? await sql`
@@ -16,12 +17,12 @@ export async function GET(req: Request) {
         LIMIT 30
       `
     : await sql`
-        SELECT scientific_name, MIN(vernacular_name) AS vernacular_name,
-               COUNT(*) AS n, COUNT(DISTINCT deployment_id) AS deployments
-        FROM events
-        WHERE event_start > now() - (${hours} || ' hours')::interval
-          AND scientific_name IS NOT NULL AND review_status <> 'rejected'
-        GROUP BY scientific_name
+        SELECT e.scientific_name, MIN(e.vernacular_name) AS vernacular_name,
+               COUNT(*) AS n, COUNT(DISTINCT e.deployment_id) AS deployments
+        FROM events e ${group ? sql`JOIN species_group g ON g.scientific_name = e.scientific_name AND g.grp = ${group}` : sql``}
+        WHERE e.event_start > now() - (${hours} || ' hours')::interval
+          AND e.scientific_name IS NOT NULL AND e.review_status <> 'rejected'
+        GROUP BY e.scientific_name
         ORDER BY n DESC
         LIMIT 200
       `;
