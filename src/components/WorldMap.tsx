@@ -23,7 +23,7 @@ interface Status { live: boolean; lastPullAt: string | null; events1h: number; s
 
 const EMPTY: FC = { type: "FeatureCollection", features: [] };
 const STYLE = "https://tiles.openfreemap.org/styles/dark";
-const HOURS = [1, 3, 6]; // the live window; longer history is in the weekly movement playback
+const HOURS = [1, 3]; // the live window; longer history is in the weekly movement playback
 // Validated for the dark surface (dataviz validator): sources are categorical, change is diverging.
 const SOURCE_COLOR: unknown[] = ["match", ["get", "source"], "birdweather", "#0891b2", "inaturalist", "#65a30d", "#db2777"];
 
@@ -31,7 +31,7 @@ export default function WorldMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const [ready, setReady] = useState(false);
-  const [hours, setHours] = useState(6);
+  const [hours, setHours] = useState(3);
   const [species, setSpecies] = useState<string | null>(null);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
   const [insights, setInsights] = useState<Insights | null>(null);
