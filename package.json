@@ -36,5 +36,9 @@
     "tsx": "^4.23.15",
     "typescript": "^5"
   },
-  "packageManager": "pnpm@10.17.1"
+  "packageManager": "pnpm@10.17.1",
+  "license": "AGPL-3.0-only",
+  "author": "Arun Rajiah (https://www.arunrajiah.com)",
+  "repository": "github:arunrajiah/wildnetwork",
+  "homepage": "https://wildnetwork.arunrajiah.com"
 }
