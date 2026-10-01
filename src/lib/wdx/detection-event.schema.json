@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/arunrajiah/wildlife-detection-exchange/schema/detection-event.schema.json",
+  "title": "WDX Detection Event",
+  "description": "A single machine-generated wildlife detection event. Wildlife Detection Exchange (WDX) v0.1.",
+  "type": "object",
+  "required": ["wdx", "eventId", "eventStart", "deployment", "detection", "source"],
+  "properties": {
+    "wdx": {
+      "type": "string",
+      "const": "0.1",
+      "description": "WDX spec version this event conforms to."
+    },
+    "eventId": {
+      "type": "string",
+      "minLength": 8,
+      "description": "Globally unique, stable identifier for this detection event. UUIDv4 recommended."
+    },
+    "eventStart": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Start of the detection window, ISO 8601 with numeric UTC offset."
+    },
+    "eventEnd": {
+      "type": "string",
+      "format": "date-time",
+      "description": "End of the detection window, ISO 8601 with numeric UTC offset."
+    },
+    "deployment": {
+      "type": "object",
+      "required": ["deploymentId", "latitude", "longitude", "sensorType"],
+      "properties": {
+        "deploymentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+        "coordinateUncertaintyMeters": { "type": "number", "exclusiveMinimum": 0 },
+        "sensorType": { "type": "string", "enum": ["acoustic-recorder", "camera-trap", "other"] },
+        "sensorModel": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "detection": {
+      "type": "object",
+      "required": ["confidence", "classifier"],
+      "properties": {
+        "scientificName": { "type": "string" },
+        "vernacularName": { "type": "string" },
+        "taxonRank": {
+          "type": "string",
+          "enum": ["species", "genus", "family", "class", "unranked"],
+          "default": "species"
+        },
+        "taxonId": {
+          "type": "string",
+          "pattern": "^[a-z]+:.+$",
+          "description": "Checklist-prefixed identifier, e.g. gbif:2493091, ebird:comtai1, inat:13858."
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "classifier": {
+          "type": "object",
+          "required": ["name", "version"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "version": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": true
+        },
+        "classifiedAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": true
+    },
+    "media": {
+      "type": "object",
+      "required": ["mediaType"],
+      "anyOf": [
+        { "required": ["url"] },
+        { "required": ["fileName"] }
+      ],
+      "properties": {
+        "mediaType": { "type": "string", "enum": ["audio", "image", "video"] },
+        "url": { "type": "string", "format": "uri" },
+        "fileName": { "type": "string" },
+        "startOffsetSeconds": { "type": "number", "minimum": 0 },
+        "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      },
+      "additionalProperties": true
+    },
+    "review": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": { "type": "string", "enum": ["unreviewed", "confirmed", "rejected", "uncertain"] },
+        "reviewedBy": { "type": "string" },
+        "reviewedAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": true
+    },
+    "source": {
+      "type": "object",
+      "required": ["system"],
+      "properties": {
+        "system": { "type": "string", "minLength": 1 },
+        "systemVersion": { "type": "string" },
+        "sourceRecordId": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "license": { "type": "string" }
+  },
+  "additionalProperties": true
+}

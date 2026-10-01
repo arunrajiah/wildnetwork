@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WildNetwork
 
-## Getting Started
+A live world map of bird and animal detections, aggregated from any network or device.
 
-First, run the development server:
+WildNetwork ingests detection events in the open [WDX](https://github.com/arunrajiah/wildlife-detection-exchange) format from acoustic stations, camera traps, community observations and GPS tracking, and shows where species are moving, when, across the whole planet.
+
+**Today's feeds:** BirdWeather (global BirdNET station network), iNaturalist (CC0 / CC-BY observations), and any device pushing WDX events to the API.
+
+## Run locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+cp .env.example .env.local
+pnpm db:up && pnpm db:migrate
+pnpm pull 60        # pull BirdWeather + iNaturalist every 60s
+pnpm dev            # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Push your own detections
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Create a key, then POST WDX events (single JSON, JSON array, or NDJSON):
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm key:create "my-birdnet-pi" birdnet-pi
+curl -X POST http://localhost:3000/api/v1/events \
+  -H "Authorization: Bearer wn_..." \
+  -H "content-type: application/json" \
+  --data-binary @events.wdx.ndjson
+```
 
-## Learn More
+## Read API
 
-To learn more about Next.js, take a look at the following resources:
+- `GET /api/v1/events?from=ISO&to=ISO&species=Erithacus+rubecula&bbox=w,s,e,n&source=birdweather&minConfidence=0.7` returns GeoJSON
+- `GET /api/v1/deployments` all sensor sites with 24h counts
+- `GET /api/v1/species?hours=24&q=robin` ranked species list
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Data and attribution
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+BirdWeather station data, iNaturalist contributors (CC0 / CC-BY only), WDX producers. Basemap: OpenFreeMap, OpenMapTiles, OpenStreetMap contributors.
