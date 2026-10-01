@@ -43,3 +43,5 @@ next-env.d.ts
 public/maplibre/
 .env.production.local
 public/agent/
+__pycache__/
+*.pyc
