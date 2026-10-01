@@ -56,7 +56,7 @@ export default function WorldMap() {
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const map = new MLMap({ container: containerRef.current, style: STYLE, center: [10, 25], zoom: 1.7, attributionControl: false });
+    const map = new MLMap({ container: containerRef.current, style: STYLE, center: [10, 25], zoom: 1.7, minZoom: 1.3, renderWorldCopies: false, attributionControl: false });
     map.addControl(new AttributionControl({ compact: true, customAttribution: "BirdWeather · iNaturalist (CC0/CC-BY) · WDX producers" }));
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     map.on("load", () => {

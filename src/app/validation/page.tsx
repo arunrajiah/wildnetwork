@@ -11,7 +11,7 @@ interface Pair { sci: string; common: string | null; lat: number; lon: number; o
 const pairs = data.pairs as Pair[];
 const S = data.summary;
 
-const W = 640, H = 420, PAD = { l: 52, r: 16, t: 14, b: 40 };
+const W = 640, H = 420, PAD = { l: 78, r: 16, t: 14, b: 40 };
 const day = (s: string) => Date.parse(s) / 86400_000;
 const fmt = (s: string) => new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 

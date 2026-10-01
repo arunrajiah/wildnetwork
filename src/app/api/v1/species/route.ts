@@ -5,17 +5,26 @@ export async function GET(req: Request) {
   const p = new URL(req.url).searchParams;
   const hours = Math.min(Number(p.get("hours") ?? 24), 24 * 30);
   const q = p.get("q");
-  const rows = await sql`
-    SELECT scientific_name, MIN(vernacular_name) AS vernacular_name,
-           COUNT(*) AS n, COUNT(DISTINCT deployment_id) AS deployments
-    FROM events
-    WHERE event_start > now() - (${hours} || ' hours')::interval
-      AND scientific_name IS NOT NULL AND review_status <> 'rejected'
-      ${q ? sql`AND (scientific_name ILIKE ${"%" + q + "%"} OR vernacular_name ILIKE ${"%" + q + "%"})` : sql``}
-    GROUP BY scientific_name
-    ORDER BY n DESC
-    LIMIT 200
-  `;
+  // A search looks through every species in the daily history, not only what was heard in the live window.
+  const rows = q
+    ? await sql`
+        SELECT scientific_name, MIN(vernacular_name) AS vernacular_name, SUM(count) AS n, COUNT(DISTINCT (cell_lat, cell_lon)) AS deployments
+        FROM species_daily
+        WHERE scientific_name ILIKE ${"%" + q + "%"} OR vernacular_name ILIKE ${"%" + q + "%"}
+        GROUP BY scientific_name
+        ORDER BY (MIN(vernacular_name) ILIKE ${q + "%"}) DESC, n DESC
+        LIMIT 30
+      `
+    : await sql`
+        SELECT scientific_name, MIN(vernacular_name) AS vernacular_name,
+               COUNT(*) AS n, COUNT(DISTINCT deployment_id) AS deployments
+        FROM events
+        WHERE event_start > now() - (${hours} || ' hours')::interval
+          AND scientific_name IS NOT NULL AND review_status <> 'rejected'
+        GROUP BY scientific_name
+        ORDER BY n DESC
+        LIMIT 200
+      `;
   return Response.json(
     rows.map((r) => ({
       scientificName: r.scientific_name,
