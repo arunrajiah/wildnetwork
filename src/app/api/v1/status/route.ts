@@ -7,7 +7,7 @@ export const maxDuration = 300;
 /** Live health: last connector runs and totals, for the top-bar status dot. */
 export async function GET() {
   const [pulls, totals] = await Promise.all([
-    sql`SELECT connector, last_run_at, last_count, last_error FROM pull_state WHERE connector NOT LIKE '\_%' ORDER BY connector`,
+    sql`SELECT connector, last_run_at, last_count, last_error FROM pull_state WHERE connector <> '_visit_lock' ORDER BY connector`,
     sql`SELECT (SELECT COUNT(*) FROM events WHERE event_start > now() - interval '1 hour') AS events_1h,
                (SELECT COUNT(*) FROM deployments) AS sensors,
                (SELECT SUM(count) FROM species_daily) AS detections,
