@@ -36,7 +36,7 @@ curl -X POST http://localhost:3000/api/v1/events \
 - `GET /api/v1/deployments` all sensor sites with 24h counts
 - `GET /api/v1/species?hours=24&q=robin` ranked species list
 
-**Live site:** https://wildnetwork-beige.vercel.app
+**Live site:** https://wildnetwork.arunrajiah.com
 
 ## Credits
 

@@ -24,7 +24,7 @@ Next.js 16 App Router (Turbopack), TypeScript, Tailwind 4, MapLibre GL 6 (OpenFr
 - public/maplibre/: worker files copied by postinstall (gitignored); MapLibre 6 worker needs them under Turbopack
 
 ## Deploy
-Vercel project wildnetwork (Hobby: crons daily only) + Neon Postgres (wildnetwork-db, PostGIS). Prod URL https://wildnetwork-beige.vercel.app. Push to main auto-deploys. Ingest every 5 min via .github/workflows/ingest.yml (secrets CRON_SECRET, var APP_URL). Migrate prod: `pnpm exec tsx --env-file=.env.production.local scripts/migrate.mts` (pull env with `vercel env pull .env.production.local --environment=production`).
+Vercel project wildnetwork (Hobby: crons daily only) + Neon Postgres (wildnetwork-db, PostGIS). Prod URL https://wildnetwork.arunrajiah.com. Push to main auto-deploys. Ingest every 5 min via .github/workflows/ingest.yml (secrets CRON_SECRET, var APP_URL). Migrate prod: `pnpm exec tsx --env-file=.env.production.local scripts/migrate.mts` (pull env with `vercel env pull .env.production.local --environment=production`).
 
 ## Commands
 - pnpm db:up (docker compose Postgres on :5433), pnpm db:migrate (applies all drizzle/*.sql, idempotent)
