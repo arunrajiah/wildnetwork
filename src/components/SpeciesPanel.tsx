@@ -26,8 +26,8 @@ function Line({ values, labels, format, color, title }: { values: (number | null
   return (
     <div>
       <div className="flex items-baseline justify-between text-xs">
-        <span className="text-slate-400">{title}</span>
-        {hi != null && <span className="text-slate-200 tabular-nums">{labels[hi].slice(5)} · {format(values[hi]!)}</span>}
+        <span className="text-slate-400 truncate pr-2">{title}</span>
+        {hi != null && <span className="text-slate-200 tabular-nums whitespace-nowrap">{labels[hi].slice(5)} · {format(values[hi]!)}</span>}
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-24" role="img" aria-label={title}
         onMouseLeave={() => setHover(null)}
@@ -92,7 +92,7 @@ export default function SpeciesPanel({ name, onClose }: { name: string; onClose:
         <Stat label="Range centre drift" value={drift == null ? "n/a" : `${Math.abs(drift).toFixed(1)}° ${drift > 0 ? "north" : "south"}`} />
         <Stat label="Frequency vs max temp" value={corr == null ? "n/a" : `r = ${corr.toFixed(2)}`} />
       </dl>
-      <Line title="Relative frequency (per 1,000 detections in its range)" values={days.map((d) => d.index)} labels={labels} format={(v) => (v >= 10 ? v.toFixed(0) : v >= 1 ? v.toFixed(1) : v.toFixed(2))} color="#22d3ee" />
+      <Line title="Relative frequency (per 1,000)" values={days.map((d) => d.index)} labels={labels} format={(v) => (v >= 10 ? v.toFixed(0) : v >= 1 ? v.toFixed(1) : v.toFixed(2))} color="#22d3ee" />
       <Line title="Range centre latitude" values={days.map((d) => d.lat)} labels={labels} format={(v) => `${v.toFixed(1)}°`} color="#a78bfa" />
       <Line title="Max temperature at range centre (°C)" values={days.map((d) => d.weather?.tmax ?? null)} labels={labels} format={(v) => `${v.toFixed(0)}°`} color="#fb923c" />
       <Line title="Max wind at range centre (km/h)" values={days.map((d) => d.weather?.wind ?? null)} labels={labels} format={(v) => `${v.toFixed(0)}`} color="#94a3b8" />

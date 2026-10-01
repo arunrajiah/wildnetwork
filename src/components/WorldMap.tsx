@@ -45,6 +45,7 @@ export default function WorldMap() {
   const [playing, setPlaying] = useState(false);
   const [thumbs, setThumbs] = useState<Record<string, string | null>>({});
   const [tab, setTab] = useState<"now" | "feed" | "about" | null>("now");
+  const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<Status | null>(null);
   const [movement, setMovement] = useState<Movement | null>(null);
   const [frame, setFrame] = useState<number | null>(null); // index into movement.frames; null = live view
@@ -128,7 +129,7 @@ export default function WorldMap() {
       fetch(`/api/v1/insights`).then((r) => r.json() as Promise<Insights>),
       fetch(`/api/v1/status`).then((r) => r.json() as Promise<Status>),
     ]);
-    setEvents(ev); setDeployments(dep); setSpeciesList(sp); setInsights(ins); setStatus(st); setFetchedAt(Date.now());
+    setEvents(ev); setDeployments(dep); setSpeciesList(sp); setInsights(ins); setStatus(st); setFetchedAt(Date.now()); setLoading(false);
     const names = [...new Set([...ins.drift, ...ins.movers, ...ins.arrivals].map((x) => x.scientificName).concat(sp.slice(0, 15).map((x) => x.scientificName), ev.features.slice(0, 40).map((f) => String(f.properties.sci))))];
     const missing = names.filter((n) => n && n !== "null" && !(n in thumbsRef.current)).slice(0, 40);
     if (missing.length) {
@@ -199,10 +200,18 @@ export default function WorldMap() {
       // One centroid track per continent that holds at least 10% of the year's detections.
       const yearTotal = frames.reduce((a, f) => a + f.total, 0);
       const byRegion = new Map<string, { n: number; pts: [number, number][] }>();
-      frames.slice(0, frame! + 1).forEach((f) => f.centroids.forEach((c) => {
+      // Trail of the last 10 weeks only, so the track reads as recent movement and not a year of scribble.
+      frames.slice(Math.max(0, frame! - 9), frame! + 1).forEach((f) => f.centroids.forEach((c) => {
         const g = byRegion.get(c.region) ?? { n: 0, pts: [] };
         g.pts.push([c.lon, c.lat]); byRegion.set(c.region, g);
       }));
+      // 3-week moving average: weekly centres jump with noise, the trend is what matters.
+      for (const g of byRegion.values()) {
+        g.pts = g.pts.map((_, i) => {
+          const w = g.pts.slice(Math.max(0, i - 1), i + 2);
+          return [w.reduce((a, p) => a + p[0], 0) / w.length, w.reduce((a, p) => a + p[1], 0) / w.length] as [number, number];
+        });
+      }
       frames.forEach((f) => f.centroids.forEach((c) => { const g = byRegion.get(c.region); if (g) g.n += c.n; }));
       const feats: GeoJSON.Feature[] = [];
       for (const g of byRegion.values()) {
@@ -235,6 +244,19 @@ export default function WorldMap() {
     return () => clearInterval(id);
   }, [playing, hours]);
 
+  const panelOpenNow = tab !== null || species !== null;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const wide = window.innerWidth >= 768;
+    map.easeTo({ padding: { left: wide ? (panelOpenNow ? 454 : 70) : 0, top: 44, bottom: 100, right: 0 }, duration: 300 });
+  }, [panelOpenNow, ready]);
+
+  // 8: on a phone the panel covers the map, so start with it closed.
+  useEffect(() => {
+    if (window.innerWidth < 768) { const t = setTimeout(() => setTab(null), 0); return () => clearTimeout(t); }
+  }, []);
+
   useEffect(() => {
     if (!mvPlaying || frames.length === 0) return;
     const id = setInterval(() => setFrame((f) => ((f ?? -1) + 1) % frames.length), 450);
@@ -242,7 +264,11 @@ export default function WorldMap() {
   }, [mvPlaying, frames.length]);
 
   const total = hours * 3600_000;
-  const pick = (name: string) => { setSpecies(name); setPlayhead(null); setPlaying(false); setFrame(null); setMvPlaying(false); setTab("now"); };
+  const selectSpecies = (name: string | null) => {
+    setSpecies(name); setPlayhead(null); setPlaying(false); setFrame(null); setMvPlaying(false);
+    setEvents(EMPTY); setLoading(true);
+  };
+  const pick = (name: string) => { selectSpecies(name); setTab("now"); };
   const flyTo = (f: GeoJSON.Feature<GeoJSON.Geometry, Record<string, unknown>>) => {
     const c = (f.geometry as GeoJSON.Point).coordinates as [number, number];
     mapRef.current?.flyTo({ center: c, zoom: Math.max(mapRef.current.getZoom(), 6), duration: 900 });
@@ -285,27 +311,27 @@ export default function WorldMap() {
 
       {/* Icon rail */}
       <nav className="absolute left-0 top-11 bottom-0 w-[4.375rem] bg-black/80 backdrop-blur-xl border-r border-white/10 flex flex-col items-center py-2 gap-1 z-20">
-        <RailButton label="Now" active={tab === "now" && !species} onClick={() => { setTab("now"); setSpecies(null); }} icon={<path d="M3 12h4l3-8 4 16 3-8h4" />} />
-        <RailButton label="Feed" active={tab === "feed" && !species} onClick={() => { setTab("feed"); setSpecies(null); }} icon={<><path d="M4 6h16M4 12h16M4 18h10" /></>} />
-        <RailButton label="About" active={tab === "about" && !species} onClick={() => { setTab("about"); setSpecies(null); }} icon={<><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></>} />
+        <RailButton label="Now" active={tab === "now" && !species} onClick={() => { setTab("now"); selectSpecies(null); }} icon={<path d="M3 12h4l3-8 4 16 3-8h4" />} />
+        <RailButton label="Feed" active={tab === "feed" && !species} onClick={() => { setTab("feed"); selectSpecies(null); }} icon={<><path d="M4 6h16M4 12h16M4 18h10" /></>} />
+        <RailButton label="About" active={tab === "about" && !species} onClick={() => { setTab("about"); selectSpecies(null); }} icon={<><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></>} />
         <Link href="/methods" className="w-14 h-14 rounded-md flex flex-col items-center justify-center gap-1 text-[10px] text-slate-400 hover:bg-white/5 hover:text-slate-200">
           <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h9l4 4v14H6z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg>
           Methods
         </Link>
         <div className="flex-1" />
-        <RailButton label="Hide" active={false} onClick={() => { setTab(null); setSpecies(null); }} icon={<path d="M15 6l-6 6 6 6" />} />
+        <RailButton label="Hide" active={false} onClick={() => { setTab(null); selectSpecies(null); }} icon={<path d="M15 6l-6 6 6 6" />} />
       </nav>
 
       {/* Panel */}
       {panelOpen && (
         <aside className="absolute left-[4.375rem] top-11 bottom-0 w-[24rem] max-w-[calc(100vw-4.375rem)] bg-slate-900/95 backdrop-blur-xl border-r border-white/10 flex flex-col z-10">
           {species ? (
-            <SpeciesPanel name={species} onClose={() => setSpecies(null)} />
+            <SpeciesPanel name={species} onClose={() => selectSpecies(null)} />
           ) : tab === "about" ? (
             <AboutPanel />
           ) : tab === "feed" ? (
             <div className="flex-1 overflow-y-auto">
-              <div className="px-4 py-2 text-[11px] text-slate-500 border-b border-white/5">Latest detections · {events.features.length.toLocaleString()} in the last {hours < 24 ? hours + "h" : hours / 24 + "d"}</div>
+              <div className="px-4 py-2 text-[11px] text-slate-500 border-b border-white/5">{loading ? "Loading latest detections" : `Latest detections · ${events.features.length.toLocaleString()}`} in the last {hours < 24 ? hours + "h" : hours / 24 + "d"}</div>
               {events.features.slice(0, 200).map((f) => {
                 const p = f.properties as Record<string, string>;
                 return (
@@ -357,8 +383,29 @@ export default function WorldMap() {
         </aside>
       )}
 
+      {/* Map legend: says what the colours mean in the current mode */}
+      <div className={`absolute top-14 right-14 z-10 rounded-md bg-black/70 backdrop-blur-xl border border-white/10 px-3 py-2 text-[11px] text-slate-300 ${panelOpen ? "max-md:hidden" : ""}`}>
+        {activeFrame ? (
+          <>
+            <div className="text-slate-400 mb-1">Share of all detections that week</div>
+            <div className="flex items-center gap-2"><span>low</span><span className="h-2 w-24 rounded-sm" style={{ background: "linear-gradient(90deg, rgba(34,211,238,0.08), rgba(34,211,238,0.75))" }} /><span>high</span></div>
+            <div className="flex items-center gap-2 mt-1"><span className="inline-block w-5 h-0.5 bg-slate-100" /><span>range centre, last 10 weeks</span></div>
+          </>
+        ) : species ? (
+          <>
+            <div className="text-slate-400 mb-1">Change in share, 3 days vs week before</div>
+            <div className="flex items-center gap-2"><span>fading</span><span className="h-2 w-24 rounded-sm" style={{ background: "linear-gradient(90deg, #3b82f6, #64748b, #ea580c)" }} /><span>surging</span></div>
+          </>
+        ) : (
+          <>
+            <div className="text-slate-400 mb-1">Detections, last {hours}h (sample)</div>
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5"><Legend color="#0891b2" label="BirdWeather" /><Legend color="#65a30d" label="iNaturalist" /><Legend color="#db2777" label="Devices" /><Legend color="#475569" label="Sensor" /></div>
+          </>
+        )}
+      </div>
+
       {/* Time slider */}
-      <div className={`absolute right-6 bottom-6 ${panelOpen ? "left-[30rem]" : "left-24"} h-[3.75rem] rounded-lg bg-black/70 backdrop-blur-xl border border-white/10 px-4 flex items-center gap-3 z-10 transition-[left]`}>
+      <div className={`absolute right-3 md:right-6 bottom-9 left-[5.25rem] ${panelOpen ? "max-md:hidden md:left-[30rem]" : "md:left-24"} h-[3.75rem] rounded-lg bg-black/70 backdrop-blur-xl border border-white/10 px-4 flex items-center gap-3 z-10 transition-[left]`}>
         {species ? (
           <>
             <span className="text-[11px] uppercase tracking-wider text-slate-400 shrink-0 whitespace-nowrap">{activeFrame ? new Date(activeFrame.week).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" }) : "Movement"}</span>
@@ -389,7 +436,7 @@ export default function WorldMap() {
           onChange={(e) => { setPlaying(false); setPlayhead(Number(e.target.value)); }} className="flex-1 accent-[#006cd9]" />
         <button onClick={() => { setPlaying(false); setPlayhead(null); }} className="text-xs text-slate-400 hover:text-white">All</button>
         <span className="text-xs text-slate-300 tabular-nums w-40 text-right hidden sm:inline">
-          {playhead === null ? `${events.features.length.toLocaleString()} events` : new Date(windowStart + playhead).toLocaleString()}
+          {loading ? "Loading" : playhead === null ? `${events.features.length.toLocaleString()} events` : new Date(windowStart + playhead).toLocaleString()}
         </span>
           </>
         )}
