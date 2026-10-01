@@ -98,6 +98,21 @@ export default function Methods() {
           on at least 8 of those 12 days. Without that last condition, most &quot;arrivals&quot; turn out to be new stations.
         </p>
 
+        <H3>Arrival dates</H3>
+        <p>
+          For each species and cell, from the weekly relative frequency over the past year: the <b>arrival week</b> is the first week the species reaches a
+          tenth of its seasonal peak, after at least 6 consecutive observed weeks below that level, and stays there the following week. The <b>peak week</b>{" "}
+          is the highest week of that season, and the <b>departure week</b> is the last week above the threshold before the next 6 week absence, when the data
+          reaches that far. A species and cell qualifies with at least 26 observed weeks, 200 detections and 30 detections in its peak week; the cell must have
+          been observed in the week before the arrival, so an outage cannot look like one. Residents, which have no 6 week absence, get no arrival date.
+          The species panel shows the median arrival week per 5 degree latitude band. Download: <code className="text-slate-200">/api/v1/arrivals?species=…&amp;format=csv</code>.
+        </p>
+        <p className="mt-3">
+          These dates were compared with independent human observations: see the <Link href="/validation" className="text-cyan-400 hover:underline">validation</Link>.
+          In short, they agree within one week for 70 percent of arrivals, run about one week late, and fail for species that are quiet on arrival and for
+          residents whose singing season starts.
+        </p>
+
         <H3>Change squares on the map</H3>
         <p>
           When a species is selected, each cell is coloured by the change in share between the last 3 days and days 8 to 14 before today:{" "}
@@ -134,9 +149,9 @@ export default function Methods() {
           </table>
         </div>
         <p className="mt-3">
-          The southward passage and its timing match what is known for this species. This is one example chosen because the answer is known, not a validation
-          study. A systematic comparison against published arrival dates and eBird Status and Trends is planned and will be published here, including the cases
-          where WildNetwork is wrong.
+          The southward passage and its timing match what is known for this species. This is one example chosen because the answer is known. The systematic
+          test is on the <Link href="/validation" className="text-cyan-400 hover:underline">validation page</Link>: 204 arrival dates across 82 species
+          compared with iNaturalist, including the cases where WildNetwork is wrong. A comparison with eBird and BirdCast products is still to do.
         </p>
 
         <H2 id="limits">5. Known limits</H2>
@@ -147,6 +162,7 @@ export default function Methods() {
           <li><b>Shares are relative.</b> If another species becomes much more vocal, every other share in that cell falls, even if nothing else changed. Seasonal changes in singing (birds call more in spring) change detection rates without any movement.</li>
           <li><b>Coarse cells.</b> At 5 degrees, movements shorter than a few hundred kilometres are invisible, and a range centre is a summary, not a route.</li>
           <li><b>Thresholds are judgement calls.</b> The minimums on this page were chosen to suppress obvious noise, not derived from a model. They are published so they can be challenged.</li>
+          <li><b>Acoustic onset is not always arrival.</b> For a resident species the first sustained detections mark the start of singing, not movement. For species that are quiet when they arrive (hummingbirds are the clearest case) the acoustic arrival date can be two to three months late.</li>
           <li><b>No uncertainty yet.</b> Measures are reported without confidence intervals.</li>
           <li><b>Short history.</b> Daily rollups cover about five weeks; weekly rollups go back up to a year but with fewer stations in earlier months.</li>
           <li><b>Weather is a single point.</b> Conditions at the range centre do not describe what a migrating bird experienced along its way, and a correlation over a few weeks is not evidence of cause.</li>
@@ -171,6 +187,7 @@ export default function Methods() {
 
         <H2 id="changes">7. Changes</H2>
         <ul className="mt-2 list-disc pl-5 space-y-1">
+          <li><b>0.3</b> (1 October 2026): arrival, peak and departure weeks per species and cell, with a first validation against iNaturalist.</li>
           <li><b>0.2</b> (1 October 2026): effort correction. All measures use share of detections; range centres use only cells observed in both periods; arrivals require a watched cell.</li>
           <li><b>0.1</b> (1 October 2026): first release, raw counts. Superseded because raw counts track station numbers.</li>
         </ul>

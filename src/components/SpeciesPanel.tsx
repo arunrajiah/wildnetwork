@@ -47,11 +47,18 @@ function Line({ values, labels, format, color, title }: { values: (number | null
   );
 }
 
+interface Arrival { cellLat: number; cellLon: number; region: string; arrivalWeek: string; peakWeek: string; departureWeek: string | null; detections: number }
 interface Media { title: string | null; thumbUrl: string | null; imageUrl: string | null; extract: string | null; pageUrl: string | null; source: string; attribution: string | null; license: string | null }
 
 export default function SpeciesPanel({ name, onClose }: { name: string; onClose: () => void }) {
   const [data, setData] = useState<SpeciesDetail | null>(null);
   const [media, setMedia] = useState<Media | null>(null);
+  const [arrivals, setArrivals] = useState<{ name: string; rows: Arrival[] } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/v1/arrivals?species=${encodeURIComponent(name)}`).then((r) => r.json()).then((d) => { if (!cancelled) setArrivals({ name, rows: d.arrivals ?? [] }); });
+    return () => { cancelled = true; };
+  }, [name]);
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/v1/media?names=${encodeURIComponent(name)}`).then((r) => r.json()).then((d) => { if (!cancelled) setMedia(d[name] ?? null); });
@@ -96,6 +103,7 @@ export default function SpeciesPanel({ name, onClose }: { name: string; onClose:
       <Line title="Range centre latitude" values={days.map((d) => d.lat)} labels={labels} format={(v) => `${v.toFixed(1)}°`} color="#a78bfa" />
       <Line title="Max temperature at range centre (°C)" values={days.map((d) => d.weather?.tmax ?? null)} labels={labels} format={(v) => `${v.toFixed(0)}°`} color="#fb923c" />
       <Line title="Max wind at range centre (km/h)" values={days.map((d) => d.weather?.wind ?? null)} labels={labels} format={(v) => `${v.toFixed(0)}`} color="#94a3b8" />
+      <ArrivalTable rows={arrivals?.name === name ? arrivals.rows : null} name={name} />
       <p className="text-[11px] text-slate-500 pb-4">
         Effort corrected: figures are the species&apos; share of all detections, so more stations do not look like more birds.{" "}
         <Link href="/methods" className="text-cyan-500 hover:underline">How this is measured, and its limits</Link>.
@@ -103,6 +111,41 @@ export default function SpeciesPanel({ name, onClose }: { name: string; onClose:
         {media?.attribution && <> Photo: {media.attribution} ({media.license}).</>}
       </p>
       </div>
+    </div>
+  );
+}
+
+/** Arrival week by latitude band for the continent with the most cells: the classic "arrival front". */
+function ArrivalTable({ rows, name }: { rows: Arrival[] | null; name: string }) {
+  if (!rows) return null;
+  if (rows.length === 0) return <div className="text-xs text-slate-500">Seasonal timing: no clear arrival in the past year (a resident here, or too few detections).</div>;
+  const byRegion = new Map<string, Arrival[]>();
+  rows.forEach((r) => byRegion.set(r.region, [...(byRegion.get(r.region) ?? []), r]));
+  const [region, list] = [...byRegion.entries()].sort((a, b) => b[1].length - a[1].length)[0];
+  const bands = new Map<number, Arrival[]>();
+  list.forEach((r) => bands.set(r.cellLat, [...(bands.get(r.cellLat) ?? []), r]));
+  const median = (xs: string[]) => xs.sort()[Math.floor((xs.length - 1) / 2)];
+  const fmt = (d: string) => new Date(d).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  return (
+    <div>
+      <div className="flex items-baseline justify-between text-xs">
+        <span className="text-slate-400">Arrival by latitude · {region}</span>
+        <a href={`/api/v1/arrivals?species=${encodeURIComponent(name)}&format=csv`} className="text-cyan-500 hover:underline">CSV</a>
+      </div>
+      <table className="mt-1 w-full text-xs tabular-nums">
+        <thead><tr className="text-left text-slate-500"><th className="font-normal py-0.5">Latitude</th><th className="font-normal">Arrives</th><th className="font-normal">Peaks</th><th className="font-normal text-right">Cells</th></tr></thead>
+        <tbody>
+          {[...bands.entries()].sort((a, b) => b[0] - a[0]).map(([lat, rs]) => (
+            <tr key={lat} className="border-t border-white/5 text-slate-200">
+              <td className="py-0.5">{Math.abs(lat)}° to {Math.abs(lat + 5)}° {lat >= 0 ? "N" : "S"}</td>
+              <td>{fmt(median(rs.map((r) => r.arrivalWeek)))}</td>
+              <td>{fmt(median(rs.map((r) => r.peakWeek)))}</td>
+              <td className="text-right text-slate-400">{rs.length}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-1 text-[11px] text-slate-500">First week the species reaches a tenth of its seasonal peak after at least six weeks away (median across cells). Typically within a week of human sightings, about a week late; for residents it marks the start of singing. <Link href="/validation" className="text-cyan-500 hover:underline">Validation</Link>.</p>
     </div>
   );
 }

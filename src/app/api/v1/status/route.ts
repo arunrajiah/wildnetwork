@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { pullAll } from "@/lib/connectors";
 import { sql } from "@/lib/db";
+import { recomputePhenology } from "@/lib/phenology";
 import { refreshRollups } from "@/lib/rollups";
 
 export const maxDuration = 300;
@@ -8,7 +9,7 @@ export const maxDuration = 300;
 /** Live health: last connector runs and totals, for the top-bar status dot. */
 export async function GET() {
   const [pulls, totals] = await Promise.all([
-    sql`SELECT connector, last_run_at, last_count, last_error FROM pull_state WHERE connector NOT IN ('_visit_lock', '_rollup_lock') ORDER BY connector`,
+    sql`SELECT connector, last_run_at, last_count, last_error FROM pull_state WHERE connector NOT LIKE '!_%' ESCAPE '!' ORDER BY connector`,
     sql`SELECT (SELECT COUNT(*) FROM events WHERE event_start > now() - interval '1 hour') AS events_1h,
                (SELECT COUNT(*) FROM deployments) AS sensors,
                (SELECT SUM(count) FROM species_daily) AS detections,
@@ -33,6 +34,12 @@ export async function GET() {
       ON CONFLICT (connector) DO UPDATE SET last_run_at = now() WHERE pull_state.last_run_at < now() - interval '55 minutes'
       RETURNING connector`;
     if (claimed.length) await refreshRollups();
+    // Arrival dates are recomputed once a day from the weekly history.
+    const daily = await sql`
+      INSERT INTO pull_state (connector, last_run_at) VALUES ('_phenology_lock', now())
+      ON CONFLICT (connector) DO UPDATE SET last_run_at = now() WHERE pull_state.last_run_at < now() - interval '23 hours'
+      RETURNING connector`;
+    if (daily.length) await recomputePhenology();
   });
   return Response.json({
     live: newest > Date.now() - 15 * 60_000,

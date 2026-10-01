@@ -26,4 +26,4 @@ body {
 }
 
 /* Map controls sit below the 44px top bar. */
-.maplibregl-ctrl-top-right { top: 3.25rem; }
+.maplibregl-map .maplibregl-ctrl-top-right { top: 3.25rem !important; }

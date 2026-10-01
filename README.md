@@ -13,7 +13,7 @@ It is free, open source, and built so that anyone with a Raspberry Pi can contri
 ## Contents
 
 - [What you can do with it](#what-you-can-do-with-it)
-- [Methods and limits](https://wildnetwork.arunrajiah.com/methods)
+- [Methods and limits](https://wildnetwork.arunrajiah.com/methods) and [validation](https://wildnetwork.arunrajiah.com/validation)
 - [Contribute data from your own device](#contribute-data-from-your-own-device)
 - [How it works](#how-it-works)
 - [Open API](#open-api)
@@ -103,6 +103,7 @@ All read endpoints are public and need no key.
 | `GET /api/v1/species?hours=24&q=robin` | Species ranked by detections |
 | `GET /api/v1/species/{scientific name}` | 30 day series, range centre, weather |
 | `GET /api/v1/species/{scientific name}/movement` | Weekly frames for the past year |
+| `GET /api/v1/arrivals?species=&format=csv` | Arrival, peak and departure week per species and cell ([validated](https://wildnetwork.arunrajiah.com/validation)) |
 | `GET /api/v1/insights` | Moving, surging, fading, arriving (effort corrected, with the methods version) |
 | `GET /api/v1/media?names=A,B` | Species photo and description with attribution |
 | `GET /api/v1/status` | Freshness and totals |
