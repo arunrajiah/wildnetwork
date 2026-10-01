@@ -12,7 +12,7 @@ interface Species { scientificName: string; vernacularName: string | null; count
 interface Insights {
   coverage: { from: string; to: string; species: number; detections: number };
   movers: { scientificName: string; vernacularName: string | null; yesterday: number; avg7: number; ratio: number }[];
-  drift: { scientificName: string; vernacularName: string | null; driftDeg: number; latNow: number; n: number }[];
+  drift: { scientificName: string; vernacularName: string | null; region: string; driftDeg: number; latNow: number; n: number }[];
   arrivals: { scientificName: string; vernacularName: string | null; cellLat: number; cellLon: number; n: number }[];
 }
 
@@ -183,9 +183,9 @@ export default function WorldMap() {
           <SpeciesPanel name={species} onClose={() => setSpecies(null)} />
         ) : (
           <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4">
-            <Section title="Moving" hint="Centroid shift, last 3 days vs week before">
+            <Section title="Moving" hint="Centroid shift per continent, 3 days vs week before">
               {insights?.drift.map((d) => (
-                <Row key={d.scientificName} onClick={() => pick(d.scientificName)} name={d.vernacularName ?? d.scientificName} sci={d.scientificName}
+                <Row key={d.scientificName + d.region} onClick={() => pick(d.scientificName)} name={d.vernacularName ?? d.scientificName} sci={`${d.scientificName} · ${d.region}`}
                   value={`${Math.abs(d.driftDeg).toFixed(1)}° ${d.driftDeg > 0 ? "N" : "S"}`} tone={d.driftDeg > 0 ? "warm" : "cool"} />
               ))}
             </Section>

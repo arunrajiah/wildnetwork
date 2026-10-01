@@ -2,6 +2,15 @@ import { sql } from "@/lib/db";
 
 export const revalidate = 300;
 
+/** Coarse continent from a 5-degree cell, so centroid drift is never a mix of hemispheres. */
+const REGION = sql`CASE
+  WHEN cell_lon < -30 AND cell_lat >= 10 THEN 'North America'
+  WHEN cell_lon < -30 THEN 'South America'
+  WHEN cell_lon < 60 AND cell_lat >= 35 THEN 'Europe'
+  WHEN cell_lon < 60 THEN 'Africa'
+  WHEN cell_lon >= 110 AND cell_lat < -10 THEN 'Oceania'
+  ELSE 'Asia' END`;
+
 /**
  * What is happening right now, derived from species_daily.
  * - movers: species whose last complete day is far above/below their prior 7-day average
@@ -25,15 +34,15 @@ export async function GET() {
     `,
     sql`
       WITH d AS (
-        SELECT scientific_name, MIN(vernacular_name) vernacular_name, day,
+        SELECT scientific_name, MIN(vernacular_name) vernacular_name, day, ${REGION} AS region,
                SUM(count) n, SUM(count * (cell_lat + 2.5)) / SUM(count) lat
         FROM species_daily WHERE day >= CURRENT_DATE - 10 AND day < CURRENT_DATE
-        GROUP BY 1, 3
-      ), recent AS (SELECT scientific_name, MIN(vernacular_name) vernacular_name, SUM(n) n, SUM(n * lat) / SUM(n) lat FROM d WHERE day >= CURRENT_DATE - 3 GROUP BY 1),
-      earlier AS (SELECT scientific_name, SUM(n) n, SUM(n * lat) / SUM(n) lat FROM d WHERE day < CURRENT_DATE - 7 GROUP BY 1)
-      SELECT r.scientific_name, r.vernacular_name, ROUND((r.lat - e.lat)::numeric, 1) AS drift_deg, ROUND(r.lat::numeric, 1) AS lat_now, r.n::int AS n
-      FROM recent r JOIN earlier e USING (scientific_name)
-      WHERE r.n >= 500 AND e.n >= 500 AND ABS(r.lat - e.lat) >= 1
+        GROUP BY 1, 3, 4
+      ), recent AS (SELECT scientific_name, region, MIN(vernacular_name) vernacular_name, SUM(n) n, SUM(n * lat) / SUM(n) lat FROM d WHERE day >= CURRENT_DATE - 3 GROUP BY 1, 2),
+      earlier AS (SELECT scientific_name, region, SUM(n) n, SUM(n * lat) / SUM(n) lat FROM d WHERE day < CURRENT_DATE - 7 GROUP BY 1, 2)
+      SELECT r.scientific_name, r.vernacular_name, r.region, ROUND((r.lat - e.lat)::numeric, 1) AS drift_deg, ROUND(r.lat::numeric, 1) AS lat_now, r.n::int AS n
+      FROM recent r JOIN earlier e USING (scientific_name, region)
+      WHERE r.n >= 300 AND e.n >= 300 AND ABS(r.lat - e.lat) >= 1
       ORDER BY ABS(r.lat - e.lat) DESC
       LIMIT 12
     `,
@@ -57,7 +66,7 @@ export async function GET() {
   return Response.json({
     coverage: { from: meta[0].first_day, to: meta[0].last_day, species: Number(meta[0].species), detections: Number(meta[0].detections) },
     movers: movers.map((r) => ({ scientificName: r.scientific_name, vernacularName: r.vernacular_name, yesterday: r.yesterday, avg7: r.avg7, ratio: Number(r.ratio) })),
-    drift: drift.map((r) => ({ scientificName: r.scientific_name, vernacularName: r.vernacular_name, driftDeg: Number(r.drift_deg), latNow: Number(r.lat_now), n: r.n })),
+    drift: drift.map((r) => ({ scientificName: r.scientific_name, vernacularName: r.vernacular_name, region: r.region, driftDeg: Number(r.drift_deg), latNow: Number(r.lat_now), n: r.n })),
     arrivals: arrivals.map((r) => ({ scientificName: r.scientific_name, vernacularName: r.vernacular_name, cellLat: r.cell_lat, cellLon: r.cell_lon, n: r.n })),
   });
 }
