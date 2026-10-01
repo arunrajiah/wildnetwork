@@ -50,7 +50,7 @@ export default function AboutPanel() {
         </p>
         <pre className="mt-2 text-[11px] bg-black/50 border border-white/10 rounded p-2 overflow-x-auto text-slate-200"><code>curl -fsSL https://wildnetwork.arunrajiah.com/agent/install.sh | bash</code></pre>
         <p className="mt-2">
-          Camera traps work too: point the agent at a folder of SpeciesNet predictions, or have any tool append WDX events to a file. Details in the{" "}
+          Camera traps and bat detectors work too: point the agent at a folder of SpeciesNet or BatDetect2 results, at a CSV exported by other software, or have any tool append WDX events to a file. Details in the{" "}
           <Link href="https://github.com/arunrajiah/wildnetwork/tree/main/agent">agent README</Link>. Everything is readable back through the open{" "}
           <code className="text-xs bg-slate-800 px-1 rounded">GET /api/v1/*</code> endpoints.
         </p>

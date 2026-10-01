@@ -131,6 +131,12 @@ export async function refreshDerived(days = 7): Promise<void> {
     SELECT scientific_name, CASE WHEN bool_or(source_system = 'birdweather') THEN 'avian' ELSE 'other' END, position(' ' in scientific_name) > 0
     FROM species_daily WHERE day >= CURRENT_DATE - 2 GROUP BY scientific_name
     ON CONFLICT (scientific_name) DO NOTHING`;
+  // Devices do not say what class a species is, but a bat classifier only reports bats.
+  await sql`
+    INSERT INTO species_group (scientific_name, grp, is_species)
+    SELECT DISTINCT scientific_name, 'bat', position(' ' in scientific_name) > 0 FROM events
+    WHERE classifier_name ILIKE '%bat%' AND scientific_name IS NOT NULL
+    ON CONFLICT (scientific_name) DO UPDATE SET grp = 'bat' WHERE species_group.grp = 'other'`;
   await sql`
     INSERT INTO species_weekly (week, source_system, scientific_name, vernacular_name, cell_lat, cell_lon, count, high_conf_count)
     SELECT date_trunc('week', day)::date, source_system, scientific_name, MIN(vernacular_name), cell_lat, cell_lon, SUM(count), SUM(high_conf_count)

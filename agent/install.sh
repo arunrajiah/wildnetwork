@@ -24,13 +24,13 @@ if [ -z "$SOURCE" ]; then
     [ -f "$p" ] && { SOURCE=birdnet-go; DBPATH="$p"; break; }
   done
 fi
-[ -n "$SOURCE" ] || { echo "No BirdNET-Pi or BirdNET-Go database found. Re-run with WDX_SOURCE and WDX_PATH set (sources: birdnet-pi, birdnet-go, speciesnet, ndjson)."; exit 1; }
+[ -n "$SOURCE" ] || { echo "No BirdNET-Pi or BirdNET-Go database found. Re-run with WDX_SOURCE and WDX_PATH set (sources: birdnet-pi, birdnet-go, speciesnet, batdetect2, csv, ndjson)."; exit 1; }
 say "Found $SOURCE at $DBPATH"
 
 NAME="${WDX_NAME:-$(hostname)}"
 KEY="${WDX_KEY:-}"
 if [ -z "$KEY" ]; then
-  REG_SOURCE="$SOURCE"; [ "$SOURCE" = ndjson ] && REG_SOURCE=other
+  REG_SOURCE="$SOURCE"; { [ "$SOURCE" = ndjson ] || [ "$SOURCE" = csv ]; } && REG_SOURCE=other
   say "Registering this device with $BASE"
   KEY="$(python3 - "$BASE" "$NAME" "$REG_SOURCE" <<'PY'
 import json, sys, urllib.request

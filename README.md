@@ -50,6 +50,8 @@ That installs **[wdx-agent](https://github.com/arunrajiah/wdx-agent)**, a single
 | A Raspberry Pi and a USB microphone | [BirdNET-Pi](https://github.com/Nachtzuster/BirdNET-Pi) + wdx-agent | [Acoustic station with BirdNET-Pi](https://github.com/arunrajiah/wdx-agent#acoustic-station-with-birdnet-pi) |
 | A Pi, mini PC, NAS or an RTSP camera with audio | [BirdNET-Go](https://github.com/tphakala/birdnet-go) + wdx-agent | [Acoustic station with BirdNET-Go](https://github.com/arunrajiah/wdx-agent#acoustic-station-with-birdnet-go) |
 | A trail camera | [SpeciesNet](https://github.com/google/cameratrapai) + wdx-agent | [Camera trap with SpeciesNet](https://github.com/arunrajiah/wdx-agent#camera-trap-with-speciesnet) |
+| An ultrasonic recorder (AudioMoth, Song Meter Mini Bat) | [BatDetect2](https://github.com/macaodha/batdetect2) + wdx-agent | [Bat detector with BatDetect2](https://github.com/arunrajiah/wdx-agent#bat-detector-with-batdetect2) |
+| A table exported by Kaleidoscope, SonoBat or similar | wdx-agent's `csv` source | [Any detections table](https://github.com/arunrajiah/wdx-agent#any-detections-table-csv) |
 | Any other detector (Frigate, MegaDetector, a custom model) | Write WDX events to a file, or POST them | [Anything else](https://github.com/arunrajiah/wdx-agent#anything-else-write-wdx-to-a-file) |
 
 Hardware lists, configuration, privacy settings and troubleshooting are in the [wdx-agent README](https://github.com/arunrajiah/wdx-agent#readme).
@@ -200,7 +202,7 @@ Contributions are welcome: new connectors, better movement analysis, design, doc
 - Species level alerts: first arrival of the season, unusual movement nights
 - Context layers for long term analysis: land use, agriculture and climate indicators
 - Per station pages for contributors
-- wdx-agent sources: Frigate, MegaDetector, Animl, BirdNET-Go v2, and bat detectors (BatDetect2, AudioMoth workflows)
+- wdx-agent sources: Frigate, MegaDetector, Animl, BirdNET-Go v2
 - More bat data: NABat and national bat monitoring schemes, by agreement
 
 ## Credits

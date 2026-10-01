@@ -8,6 +8,8 @@ Sources:
   birdnet-pi   BirdNET-Pi SQLite database (table `detections`)
   birdnet-go   BirdNET-Go SQLite database (table `notes`)
   speciesnet   SpeciesNet / MegaDetector `predictions.json` files in a folder (camera traps)
+  batdetect2   BatDetect2 result JSON files in a folder (bat detectors such as AudioMoth)
+  csv          any detections table, with the column names given in the config (Kaleidoscope, SonoBat, ...)
   ndjson       any `.wdx.ndjson` file that another tool appends WDX events to
 
 Usage:
@@ -19,19 +21,21 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import csv
 import hashlib
 import json
 import os
+import re
 import socket
 import sqlite3
 import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 BATCH = 500
 
 
@@ -47,7 +51,7 @@ def local_iso(date: str, clock: str) -> str:
 
 class Settings:
     def __init__(self, path: str):
-        cp = configparser.ConfigParser()
+        cp = configparser.ConfigParser(interpolation=None)  # so date formats like %Y-%m-%d can be written plainly
         if not cp.read(path):
             sys.exit(f"config not found: {path}")
         a = cp["agent"]
@@ -66,6 +70,16 @@ class Settings:
         self.media_base_url = a.get("media_base_url", "")
         self.license = a.get("license", "https://creativecommons.org/licenses/by/4.0/")
         self.state_path = os.path.expanduser(a.get("state_file", "~/.wdx-agent-state.json"))
+        # What the server sees as source.system. The csv source is generic, so it reports "other" unless told otherwise.
+        self.system = a.get("system", "") or ("other" if self.source == "csv" else self.source)
+        self.sensor_type = a.get("sensor_type", "acoustic-recorder")
+        self.sensor_model = a.get("sensor_model", "")
+        self.classifier = a.get("classifier", "")
+        self.classifier_version = a.get("classifier_version", "unknown")
+        # Recorders such as AudioMoth put the start time in the file name, in UTC unless configured otherwise.
+        self.filename_timezone = a.get("filename_timezone", "utc").lower()
+        self.min_calls = a.getint("min_calls", fallback=2)
+        self.csv = {k[4:]: v for k, v in a.items() if k.startswith("csv_")}
 
 
 def default_station_id() -> str:
@@ -102,7 +116,7 @@ def base_event(s: Settings, event_id: str, start: str, dep: dict, record_id: str
         "eventStart": start,
         "deployment": dep,
         "review": {"status": "unreviewed"},
-        "source": {"system": s.source, "systemVersion": f"wdx-agent/{VERSION}", "sourceRecordId": record_id},
+        "source": {"system": s.system, "systemVersion": f"wdx-agent/{VERSION}", "sourceRecordId": record_id},
         "license": s.license,
     }
 
@@ -198,6 +212,136 @@ def read_speciesnet(s: Settings, cursor):
             break
 
 
+FILENAME_TIME = re.compile(r"(\d{4})-?(\d{2})-?(\d{2})[_T-]?(\d{2})[-:]?(\d{2})[-:]?(\d{2})")
+
+
+def recording_start(s: Settings, name: str, fallback_path: str):
+    """Start time of a recording: from its file name (20260930_213000.WAV), else the file's modification time."""
+    m = FILENAME_TIME.search(os.path.basename(name))
+    if m:
+        try:
+            dt = datetime(*(int(g) for g in m.groups()))
+            return dt.replace(tzinfo=timezone.utc) if s.filename_timezone == "utc" else dt.astimezone()
+        except ValueError:
+            pass
+    return datetime.fromtimestamp(os.path.getmtime(fallback_path)).astimezone()
+
+
+def read_batdetect2(s: Settings, cursor):
+    """Folder of BatDetect2 result JSON files, one per recording. Cursor maps each file already sent to its mtime.
+
+    BatDetect2 reports every echolocation call. A bat pass is many calls, so calls are grouped:
+    one event per species per recording, with the highest class probability and at least `min_calls` calls.
+    """
+    dep = deployment(s, None, None, "acoustic-recorder", s.sensor_model or "Bat detector")
+    if dep is None:
+        sys.exit("bat detectors need latitude/longitude in the config")
+    seen = dict(cursor or {})
+    sent = 0
+    for f in sorted(Path(s.path).glob("**/*.json")):
+        mtime = f.stat().st_mtime
+        if seen.get(str(f)) == mtime:
+            continue
+        try:
+            doc = json.loads(f.read_text())
+        except (OSError, ValueError):
+            continue
+        calls = doc.get("annotation") if isinstance(doc, dict) else None
+        if not isinstance(calls, list):
+            continue  # some other JSON file
+        rec = str(doc.get("id") or f.stem)
+        start = recording_start(s, rec, str(f))
+        by_class: dict = {}
+        for c in calls:
+            prob, name = c.get("class_prob"), c.get("class")
+            if not name or prob is None or prob < s.min_confidence:
+                continue
+            g = by_class.setdefault(name, {"n": 0, "prob": 0.0, "first": None})
+            g["n"] += 1
+            g["prob"] = max(g["prob"], float(prob))
+            t = c.get("start_time")
+            if t is not None and (g["first"] is None or t < g["first"]):
+                g["first"] = float(t)
+        file_events = []
+        for name, g in sorted(by_class.items()):
+            if g["n"] < s.min_calls:
+                continue
+            rid = hashlib.sha256(f"{rec}:{name}".encode()).hexdigest()[:16]
+            when = start + timedelta(seconds=g["first"] or 0)
+            ev = base_event(s, f"{s.system}:{s.station_id}:{rid}", when.isoformat(timespec="seconds"), dep, rid)
+            ev["detection"] = {"scientificName": name, "taxonRank": "species" if " " in name.strip() else "unranked",
+                               "confidence": min(1.0, g["prob"]),
+                               "classifier": {"name": s.classifier or "BatDetect2", "version": s.classifier_version}}
+            ev["media"] = {"mediaType": "audio", "fileName": os.path.basename(rec)}
+            file_events.append(ev)
+        seen[str(f)] = mtime
+        for ev in file_events:
+            sent += 1
+            yield dict(seen), ev
+        if sent >= BATCH:
+            break
+
+
+def read_csv(s: Settings, cursor):
+    """Any detections table. Column names come from the config (csv_species, csv_confidence, csv_datetime, ...).
+
+    Cursor is the number of data rows already sent, so the file must only ever be appended to.
+    """
+    c = s.csv
+    if "species" not in c or not ("datetime" in c or ("date" in c and "time" in c)):
+        sys.exit("csv source needs csv_species and either csv_datetime or csv_date + csv_time in the config")
+    scale = float(c.get("confidence_scale", "1"))
+    fmt = c.get("datetime_format", "")
+    species_map = {}
+    if c.get("species_map"):
+        with open(os.path.expanduser(c["species_map"]), newline="", encoding="utf-8-sig") as fh:
+            species_map = {r[0].strip(): r[1].strip() for r in csv.reader(fh) if len(r) >= 2}
+    done = int(cursor or 0)
+    with open(s.path, newline="", encoding="utf-8-sig") as fh:
+        reader = csv.DictReader(fh, delimiter=c.get("delimiter", ",").replace("\\t", "\t"))
+        n = 0
+        for i, row in enumerate(reader, start=1):
+            if i <= done:
+                continue
+            if n >= BATCH:
+                break
+            name = (row.get(c["species"]) or "").strip()
+            name = species_map.get(name, name)
+            raw_time = (row.get(c["datetime"]) if "datetime" in c else f"{row.get(c['date'], '')} {row.get(c['time'], '')}") or ""
+            raw_time = raw_time.strip()
+            try:
+                conf = float(row[c["confidence"]]) / scale if c.get("confidence") else 1.0
+                when = datetime.strptime(raw_time, fmt) if fmt else datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
+            except (KeyError, ValueError, TypeError):
+                n += 1
+                yield i, None  # unreadable row: advance past it
+                continue
+            if when.tzinfo is None:
+                # Times without an offset are the device's local time, unless csv_timezone = utc.
+                when = when.replace(tzinfo=timezone.utc) if c.get("timezone", "local").lower() == "utc" else when.astimezone()
+            n += 1
+            if not name or name.lower() in ("noid", "no id", "noise", "none", "unknown") or conf < s.min_confidence:
+                yield i, None
+                continue
+            lat = row.get(c.get("latitude", "")) or None
+            lon = row.get(c.get("longitude", "")) or None
+            dep = deployment(s, float(lat) if lat else None, float(lon) if lon else None, s.sensor_type, s.sensor_model or "CSV import")
+            if dep is None:
+                sys.exit("no coordinates: set latitude/longitude in the config, or csv_latitude/csv_longitude columns")
+            fname = (row.get(c.get("file", "")) or "").strip()
+            rid = hashlib.sha256(f"{raw_time}|{name}|{fname}|{i}".encode()).hexdigest()[:16]
+            ev = base_event(s, f"{s.system}:{s.station_id}:{rid}", when.isoformat(timespec="seconds"), dep, rid)
+            det = {"scientificName": name, "taxonRank": "species" if " " in name else "unranked", "confidence": max(0.0, min(1.0, conf)),
+                   "classifier": {"name": s.classifier or "unknown", "version": s.classifier_version}}
+            common = (row.get(c.get("common", "")) or "").strip()
+            if common:
+                det["vernacularName"] = common
+            ev["detection"] = det
+            if fname:
+                ev["media"] = {"mediaType": "image" if s.sensor_type == "camera-trap" else "audio", "fileName": os.path.basename(fname)}
+            yield i, ev
+
+
 def read_ndjson(s: Settings, cursor):
     """Tail a WDX NDJSON file. Cursor is the byte offset."""
     offset = int(cursor or 0)
@@ -219,7 +363,8 @@ def read_ndjson(s: Settings, cursor):
                     log(f"skipping malformed line before byte {offset}")
 
 
-SOURCES = {"birdnet-pi": read_birdnet_pi, "birdnet-go": read_birdnet_go, "speciesnet": read_speciesnet, "ndjson": read_ndjson}
+SOURCES = {"birdnet-pi": read_birdnet_pi, "birdnet-go": read_birdnet_go, "speciesnet": read_speciesnet,
+           "batdetect2": read_batdetect2, "csv": read_csv, "ndjson": read_ndjson}
 
 
 def post(s: Settings, events: list) -> dict:
@@ -240,17 +385,17 @@ def run_once(s: Settings, dry: bool) -> int:
     batch = list(SOURCES[s.source](s, state.get(key)))
     if not batch:
         return 0
-    events = [e for _, e in batch]
+    events = [e for _, e in batch if e is not None]  # None marks a row that was skipped but still moves the cursor
     if dry:
         for e in events[:5]:
             print(json.dumps(e, indent=2))
         log(f"dry run: {len(events)} events ready (showing up to 5)")
         return len(events)
-    res = post(s, events)
+    res = post(s, events) if events else {"received": 0, "inserted": 0, "updated": 0, "rejected": 0}
     log(f"sent {res.get('received')} (new {res.get('inserted')}, updated {res.get('updated')}, rejected {res.get('rejected')})")
     if res.get("rejected"):
         log(f"rejected sample: {json.dumps(res.get('rejectedDetails', [])[:2])}")
-    if events and not res.get("received"):
+    if events and not res.get("received") and res.get("rejected"):
         log("server rejected the whole batch; not advancing (check api_key and source in the config)")
         return 0
     # The cursor only advances after the server accepted the batch, so an offline Pi just catches up later.
