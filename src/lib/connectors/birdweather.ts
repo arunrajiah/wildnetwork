@@ -3,7 +3,7 @@ import type { PullConnector } from "./types";
 
 const ENDPOINT = "https://app.birdweather.com/graphql";
 const PAGE = 500;
-const MAX_PAGES = 20; // per run; cursor carries over
+const MAX_PAGES = 40; // per run (20k events); cursor carries over
 const MIN_CONFIDENCE = 0.7;
 
 const QUERY = `

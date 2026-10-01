@@ -1,0 +1,17 @@
+name: ingest
+# Vercel Hobby crons are daily only, so GitHub Actions drives the live pull and hourly rollups.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull BirdWeather + iNaturalist
+        run: |
+          curl -sS --max-time 280 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "${{ vars.APP_URL }}/api/cron/pull" | head -c 2000
+      - name: Rollup (hourly, first run of each hour)
+        if: ${{ github.event_name == 'workflow_dispatch' || endsWith(github.run_started_at, ':00:00Z') || endsWith(github.run_started_at, ':01:00Z') || endsWith(github.run_started_at, ':02:00Z') || endsWith(github.run_started_at, ':03:00Z') || endsWith(github.run_started_at, ':04:00Z') }}
+        run: |
+          curl -sS --max-time 290 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "${{ vars.APP_URL }}/api/cron/rollup" | head -c 2000
