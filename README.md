@@ -35,6 +35,8 @@ It is free, open source, and built so that anyone with a Raspberry Pi can contri
 
 ## Contribute data from your own device
 
+The step by step guide, for people who already have a device and for people starting from nothing, is at **[wildnetwork.arunrajiah.com/contribute](https://wildnetwork.arunrajiah.com/contribute)**. Stations that already report to BirdWeather are included automatically and should not install the agent as well.
+
 If you run BirdNET-Pi or BirdNET-Go on a Raspberry Pi:
 
 ```bash

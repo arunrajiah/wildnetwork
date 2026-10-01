@@ -354,6 +354,10 @@ export default function WorldMap() {
         <RailButton label="Now" active={tab === "now" && !species} onClick={() => { setTab("now"); selectSpecies(null); }} icon={<path d="M3 12h4l3-8 4 16 3-8h4" />} />
         <RailButton label="Feed" active={tab === "feed" && !species} onClick={() => { setTab("feed"); selectSpecies(null); }} icon={<><path d="M4 6h16M4 12h16M4 18h10" /></>} />
         <RailButton label="About" active={tab === "about" && !species} onClick={() => { setTab("about"); selectSpecies(null); }} icon={<><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></>} />
+        <Link href="/contribute" className="w-14 h-14 rounded-md flex flex-col items-center justify-center gap-1 text-[10px] text-slate-400 hover:bg-white/5 hover:text-slate-200">
+          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /><circle cx="12" cy="12" r="9" /></svg>
+          Add data
+        </Link>
         <Link href="/methods" className="w-14 h-14 rounded-md flex flex-col items-center justify-center gap-1 text-[10px] text-slate-400 hover:bg-white/5 hover:text-slate-200">
           <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h9l4 4v14H6z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg>
           Methods
