@@ -13,6 +13,7 @@ It is free, open source, and built so that anyone with a Raspberry Pi can contri
 ## Contents
 
 - [What you can do with it](#what-you-can-do-with-it)
+- [Methods and limits](https://wildnetwork.arunrajiah.com/methods)
 - [Contribute data from your own device](#contribute-data-from-your-own-device)
 - [How it works](#how-it-works)
 - [Open API](#open-api)
@@ -89,7 +90,7 @@ Keys are tied to one source system. Events are validated against the WDX schema,
 
 - **One format.** Every record, whatever its origin, becomes a WDX event. Connectors never write to tables directly.
 - **Live window plus rollups.** Raw events are kept for the live map. History is kept as counts per species, per 5 degree cell, per day and per week, which is what movement analysis needs and stays small.
-- **Movement is measured, not drawn.** Drift is the shift of a species' detection weighted centre within one continent. Surges compare yesterday to the previous seven days. Arrivals are first appearances in a cell in twelve days.
+- **Movement is measured, not drawn, and corrected for effort.** Every measure uses a species' share of all detections in a cell, never its raw count, so more stations do not look like more birds. The definitions, thresholds and known limits are published at **[wildnetwork.arunrajiah.com/methods](https://wildnetwork.arunrajiah.com/methods)**.
 
 ## Open API
 
@@ -102,7 +103,7 @@ All read endpoints are public and need no key.
 | `GET /api/v1/species?hours=24&q=robin` | Species ranked by detections |
 | `GET /api/v1/species/{scientific name}` | 30 day series, range centre, weather |
 | `GET /api/v1/species/{scientific name}/movement` | Weekly frames for the past year |
-| `GET /api/v1/insights` | Moving, surging, fading, arriving |
+| `GET /api/v1/insights` | Moving, surging, fading, arriving (effort corrected, with the methods version) |
 | `GET /api/v1/media?names=A,B` | Species photo and description with attribution |
 | `GET /api/v1/status` | Freshness and totals |
 | `POST /api/v1/register` | A device key (5 per address per day) |

@@ -1,28 +1,58 @@
 import { sql } from "@/lib/db";
+import { METHODS_VERSION, MIN_EFFORT_DAY } from "@/lib/methods";
 
 export const revalidate = 600;
 
 /**
- * One species over time: daily counts, detection-weighted centroid, top cells, and the weather at the centroid.
+ * One species over time, effort corrected: daily index, share-weighted range centre, per-cell change, and weather at the centre.
  * Weather is Open-Meteo ERA5 (archive, ~5 day lag) patched with the forecast API's past_days for recent days.
  */
 export async function GET(_req: Request, ctx: { params: Promise<{ name: string }> }) {
   const name = decodeURIComponent((await ctx.params).name);
 
   const [daily, cells, info] = await Promise.all([
+    // Daily series over the species' range (cells where it was detected in the window), effort corrected:
+    // index = detections per 1,000 detections of all species; centre = weighted by per-cell share.
     sql`
-      SELECT day::text AS day, SUM(count)::int n, SUM(high_conf_count)::int high,
-             SUM(count * (cell_lat + 2.5)) / SUM(count) lat, SUM(count * (cell_lon + 2.5)) / SUM(count) lon,
-             COUNT(*)::int cells
-      FROM species_daily WHERE scientific_name = ${name} AND day >= CURRENT_DATE - 30 AND day < CURRENT_DATE
-      GROUP BY day ORDER BY day
+      WITH range AS (
+        SELECT DISTINCT cell_lat, cell_lon FROM species_daily WHERE scientific_name = ${name} AND day >= CURRENT_DATE - 30
+      ), sp AS (
+        SELECT day, cell_lat, cell_lon, SUM(count)::float AS n, SUM(high_conf_count) AS high
+        FROM species_daily WHERE scientific_name = ${name} AND day >= CURRENT_DATE - 30 AND day < CURRENT_DATE
+        GROUP BY 1, 2, 3
+      ), ef AS (
+        SELECT e.day, e.cell_lat, e.cell_lon, e.detections::float AS effort
+        FROM effort_daily e JOIN range USING (cell_lat, cell_lon)
+        WHERE e.day >= CURRENT_DATE - 30 AND e.day < CURRENT_DATE AND e.detections >= ${MIN_EFFORT_DAY}
+      )
+      SELECT ef.day::text AS day, COALESCE(SUM(sp.n), 0)::int AS n, COALESCE(SUM(sp.high), 0)::int AS high,
+             SUM(ef.effort)::bigint AS effort,
+             1000 * COALESCE(SUM(sp.n), 0) / SUM(ef.effort) AS idx,
+             SUM(sp.n / ef.effort * (cell_lat + 2.5)) / NULLIF(SUM(sp.n / ef.effort), 0) AS lat,
+             SUM(sp.n / ef.effort * (cell_lon + 2.5)) / NULLIF(SUM(sp.n / ef.effort), 0) AS lon,
+             COUNT(sp.n)::int AS cells
+      FROM ef LEFT JOIN sp USING (day, cell_lat, cell_lon)
+      GROUP BY ef.day ORDER BY ef.day
     `,
+    // Per-cell rates for the change squares: share in the last 3 days against days 8 to 14 ago.
     sql`
-      SELECT cell_lat, cell_lon, SUM(count)::int n,
-             SUM(count) FILTER (WHERE day >= CURRENT_DATE - 3)::int recent,
-             SUM(count) FILTER (WHERE day < CURRENT_DATE - 7)::int earlier
-      FROM species_daily WHERE scientific_name = ${name} AND day >= CURRENT_DATE - 14
-      GROUP BY 1, 2 ORDER BY n DESC LIMIT 200
+      WITH sp AS (
+        SELECT cell_lat, cell_lon, SUM(count)::int AS n,
+               COALESCE(SUM(count) FILTER (WHERE day >= CURRENT_DATE - 3), 0)::float AS recent,
+               COALESCE(SUM(count) FILTER (WHERE day < CURRENT_DATE - 7), 0)::float AS earlier
+        FROM species_daily WHERE scientific_name = ${name} AND day >= CURRENT_DATE - 14 AND day < CURRENT_DATE
+        GROUP BY 1, 2
+      ), ef AS (
+        SELECT cell_lat, cell_lon,
+               COALESCE(SUM(detections) FILTER (WHERE day >= CURRENT_DATE - 3), 0)::float AS e_recent,
+               COALESCE(SUM(detections) FILTER (WHERE day < CURRENT_DATE - 7), 0)::float AS e_earlier
+        FROM effort_daily WHERE day >= CURRENT_DATE - 14 AND day < CURRENT_DATE GROUP BY 1, 2
+      )
+      SELECT cell_lat, cell_lon, sp.n,
+             CASE WHEN ef.e_recent >= ${3 * MIN_EFFORT_DAY} THEN 1000 * sp.recent / ef.e_recent END AS recent,
+             CASE WHEN ef.e_earlier >= ${3 * MIN_EFFORT_DAY} THEN 1000 * sp.earlier / ef.e_earlier END AS earlier
+      FROM sp JOIN ef USING (cell_lat, cell_lon)
+      ORDER BY sp.n DESC LIMIT 200
     `,
     sql`SELECT MIN(vernacular_name) vernacular_name, array_agg(DISTINCT source_system) sources FROM species_daily WHERE scientific_name = ${name}`,
   ]);
@@ -31,6 +61,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
   const weather: Record<string, { tmax: number | null; tmin: number | null; precip: number | null; wind: number | null; windDir: number | null }> = {};
   const byCell = new Map<string, string[]>();
   for (const d of daily) {
+    if (d.lat == null) continue;
     const key = `${Math.round(Number(d.lat))},${Math.round(Number(d.lon))}`;
     byCell.set(key, [...(byCell.get(key) ?? []), String(d.day)]);
   }
@@ -57,7 +88,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
     scientificName: name,
     vernacularName: info[0]?.vernacular_name ?? null,
     sources: info[0]?.sources ?? [],
-    daily: daily.map((d) => ({ day: d.day, n: d.n, high: d.high, lat: Number(d.lat), lon: Number(d.lon), cells: d.cells, weather: weather[String(d.day)] ?? null })),
-    cells: cells.map((c) => ({ lat: c.cell_lat, lon: c.cell_lon, n: c.n, recent: c.recent ?? 0, earlier: c.earlier ?? 0 })),
+    methods: METHODS_VERSION,
+    daily: daily.map((d) => ({ day: d.day, n: d.n, high: d.high, effort: Number(d.effort), index: Number(d.idx), lat: d.lat == null ? null : Number(d.lat), lon: d.lon == null ? null : Number(d.lon), cells: d.cells, weather: weather[String(d.day)] ?? null })),
+    // recent / earlier are per-1,000 shares; null when the cell was not observed enough in that period
+    cells: cells.map((c) => ({ lat: c.cell_lat, lon: c.cell_lon, n: c.n, recent: c.recent == null ? null : Number(c.recent), earlier: c.earlier == null ? null : Number(c.earlier) })),
   });
 }

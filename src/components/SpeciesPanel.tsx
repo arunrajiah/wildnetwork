@@ -1,13 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export interface SpeciesDetail {
   scientificName: string;
   vernacularName: string | null;
   sources: string[];
-  daily: { day: string; n: number; high: number | null; lat: number; lon: number; cells: number; weather: { tmax: number | null; tmin: number | null; precip: number | null; wind: number | null; windDir: number | null } | null }[];
-  cells: { lat: number; lon: number; n: number; recent: number; earlier: number }[];
+  methods?: string;
+  daily: { day: string; n: number; high: number | null; effort: number; index: number; lat: number | null; lon: number | null; cells: number; weather: { tmax: number | null; tmin: number | null; precip: number | null; wind: number | null; windDir: number | null } | null }[];
+  cells: { lat: number; lon: number; n: number; recent: number | null; earlier: number | null }[];
 }
 
 const W = 560, H = 96, PAD = { l: 36, r: 8, t: 10, b: 18 };
@@ -65,10 +67,9 @@ export default function SpeciesPanel({ name, onClose }: { name: string; onClose:
   const days = data.daily;
   const labels = days.map((d) => d.day);
   const total = days.reduce((a, d) => a + d.n, 0);
-  const last = days[days.length - 1];
-  const first = days[0];
-  const drift = last && first && days.length > 3 ? last.lat - first.lat : null;
-  const corr = pearson(days.map((d) => d.n), days.map((d) => d.weather?.tmax ?? null));
+  const located = days.filter((d) => d.lat != null);
+  const drift = located.length > 3 ? located[located.length - 1].lat! - located[0].lat! : null;
+  const corr = pearson(days.map((d) => d.index), days.map((d) => d.weather?.tmax ?? null));
 
   return (
     <div className="flex flex-col gap-3 h-full overflow-y-auto">
@@ -88,15 +89,17 @@ export default function SpeciesPanel({ name, onClose }: { name: string; onClose:
       {media?.extract && <p className="text-xs text-slate-300 leading-relaxed">{media.extract.split(". ").slice(0, 2).join(". ").replace(/\.$/, "")}.{media.pageUrl && <> <a href={media.pageUrl} target="_blank" rel="noreferrer" className="text-cyan-500 hover:underline">Wikipedia</a></>}</p>}
       <dl className="grid grid-cols-3 gap-2 text-xs">
         <Stat label="Detections, 30d" value={total.toLocaleString()} />
-        <Stat label="Centroid drift" value={drift == null ? "n/a" : `${Math.abs(drift).toFixed(1)}° ${drift > 0 ? "north" : "south"}`} />
-        <Stat label="Count vs max temp" value={corr == null ? "n/a" : `r = ${corr.toFixed(2)}`} />
+        <Stat label="Range centre drift" value={drift == null ? "n/a" : `${Math.abs(drift).toFixed(1)}° ${drift > 0 ? "north" : "south"}`} />
+        <Stat label="Frequency vs max temp" value={corr == null ? "n/a" : `r = ${corr.toFixed(2)}`} />
       </dl>
-      <Line title="Daily detections" values={days.map((d) => d.n)} labels={labels} format={(v) => v.toLocaleString()} color="#22d3ee" />
-      <Line title="Centroid latitude" values={days.map((d) => d.lat)} labels={labels} format={(v) => `${v.toFixed(1)}°`} color="#a78bfa" />
-      <Line title="Max temperature at centroid (°C)" values={days.map((d) => d.weather?.tmax ?? null)} labels={labels} format={(v) => `${v.toFixed(0)}°`} color="#fb923c" />
-      <Line title="Max wind at centroid (km/h)" values={days.map((d) => d.weather?.wind ?? null)} labels={labels} format={(v) => `${v.toFixed(0)}`} color="#94a3b8" />
+      <Line title="Relative frequency (per 1,000 detections in its range)" values={days.map((d) => d.index)} labels={labels} format={(v) => (v >= 10 ? v.toFixed(0) : v >= 1 ? v.toFixed(1) : v.toFixed(2))} color="#22d3ee" />
+      <Line title="Range centre latitude" values={days.map((d) => d.lat)} labels={labels} format={(v) => `${v.toFixed(1)}°`} color="#a78bfa" />
+      <Line title="Max temperature at range centre (°C)" values={days.map((d) => d.weather?.tmax ?? null)} labels={labels} format={(v) => `${v.toFixed(0)}°`} color="#fb923c" />
+      <Line title="Max wind at range centre (km/h)" values={days.map((d) => d.weather?.wind ?? null)} labels={labels} format={(v) => `${v.toFixed(0)}`} color="#94a3b8" />
       <p className="text-[11px] text-slate-500 pb-4">
-        Sources: {data.sources.join(", ")}. Weather: Open-Meteo ERA5 at the daily detection centroid. Map squares show change in the last 3 days versus the week before.
+        Effort corrected: figures are the species&apos; share of all detections, so more stations do not look like more birds.{" "}
+        <Link href="/methods" className="text-cyan-500 hover:underline">How this is measured, and its limits</Link>.
+        Sources: {data.sources.join(", ")}. Weather: Open-Meteo ERA5 at the range centre. Map squares show the change in share, last 3 days against the week before.
         {media?.attribution && <> Photo: {media.attribution} ({media.license}).</>}
       </p>
       </div>

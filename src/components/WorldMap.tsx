@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { AttributionControl, Map as MLMap, NavigationControl, Popup, setWorkerUrl, type GeoJSONSource, type MapLayerMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -18,7 +19,7 @@ interface Insights {
   arrivals: { scientificName: string; vernacularName: string | null; cellLat: number; cellLon: number; n: number }[];
 }
 
-interface Movement { scientificName: string; frames: { week: string; total: number; cells: [number, number, number][]; centroids: { region: string; n: number; lat: number; lon: number }[] }[] }
+interface Movement { scientificName: string; frames: { week: string; total: number; index: number; cells: [number, number, number, number][]; centroids: { region: string; n: number; lat: number; lon: number }[] }[] }
 interface Status { live: boolean; lastPullAt: string | null; events1h: number; sensors: number; detections: number; species: number }
 
 const EMPTY: FC = { type: "FeatureCollection", features: [] };
@@ -155,8 +156,9 @@ export default function WorldMap() {
       }
       setCells({
         type: "FeatureCollection",
-        features: d.cells.map((c) => {
-          const r = c.recent / 3, e = c.earlier / 7; // per-day rates
+        // Change is computed from effort-corrected shares; cells not observed enough in either period are left out.
+        features: d.cells.filter((c) => c.recent != null && c.earlier != null).map((c) => {
+          const r = c.recent!, e = c.earlier!;
           const change = r + e === 0 ? 0 : Math.max(-1, Math.min(1, (r - e) / (r + e)));
           return {
             type: "Feature",
@@ -179,15 +181,19 @@ export default function WorldMap() {
 
   const frames = useMemo(() => (species && movement?.scientificName === species ? movement.frames : []), [species, movement]);
   const activeFrame = species && frame !== null && frames[frame] ? frames[frame] : null;
+  const shareScale = useMemo(() => {
+    const all = frames.flatMap((f) => f.cells.map((c) => c[3])).sort((a, b) => a - b);
+    return all.length ? Math.max(all[Math.floor(all.length * 0.95)], 1e-6) : 1;
+  }, [frames]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
     const weekSrc = map.getSource("week-cells") as GeoJSONSource, trackSrc = map.getSource("track") as GeoJSONSource;
     if (activeFrame) {
-      const max = Math.max(1, ...activeFrame.cells.map((c) => c[2]));
-      weekSrc?.setData({ type: "FeatureCollection", features: activeFrame.cells.map(([lat, lon, n]) => ({
-        type: "Feature", properties: { share: Math.sqrt(n / max) },
+      // Shade by the species' share of all detections in the cell, scaled to the year's 95th percentile so weeks are comparable.
+      weekSrc?.setData({ type: "FeatureCollection", features: activeFrame.cells.map(([lat, lon, , share]) => ({
+        type: "Feature", properties: { share: Math.min(1, Math.sqrt(share / shareScale)) },
         geometry: { type: "Polygon", coordinates: [[[lon, lat], [lon + 5, lat], [lon + 5, lat + 5], [lon, lat + 5], [lon, lat]]] },
       })) });
       // One centroid track per continent that holds at least 10% of the year's detections.
@@ -220,7 +226,7 @@ export default function WorldMap() {
       fc = { ...events, features: events.features.filter((f) => { const t = Date.parse(String(f.properties.t)); return t <= cutoff && t > cutoff - trail; }) };
     }
     (map.getSource("events") as GeoJSONSource)?.setData(fc);
-  }, [events, deployments, cells, species, playhead, ready, windowStart, hours, activeFrame, frames, frame]);
+  }, [events, deployments, cells, species, playhead, ready, windowStart, hours, activeFrame, frames, frame, shareScale]);
 
   useEffect(() => {
     if (!playing) return;
@@ -282,6 +288,10 @@ export default function WorldMap() {
         <RailButton label="Now" active={tab === "now" && !species} onClick={() => { setTab("now"); setSpecies(null); }} icon={<path d="M3 12h4l3-8 4 16 3-8h4" />} />
         <RailButton label="Feed" active={tab === "feed" && !species} onClick={() => { setTab("feed"); setSpecies(null); }} icon={<><path d="M4 6h16M4 12h16M4 18h10" /></>} />
         <RailButton label="About" active={tab === "about" && !species} onClick={() => { setTab("about"); setSpecies(null); }} icon={<><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></>} />
+        <Link href="/methods" className="w-14 h-14 rounded-md flex flex-col items-center justify-center gap-1 text-[10px] text-slate-400 hover:bg-white/5 hover:text-slate-200">
+          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h9l4 4v14H6z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg>
+          Methods
+        </Link>
         <div className="flex-1" />
         <RailButton label="Hide" active={false} onClick={() => { setTab(null); setSpecies(null); }} icon={<path d="M15 6l-6 6 6 6" />} />
       </nav>
@@ -315,19 +325,19 @@ export default function WorldMap() {
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4">
-              <Section title="Moving" hint="Centroid shift per continent, 3 days vs week before">
+              <Section title="Moving" hint="Range centre shift per continent, effort corrected">
                 {insights?.drift.map((d) => (
                   <Row key={d.scientificName + d.region} thumb={thumbs[d.scientificName]} onClick={() => pick(d.scientificName)} name={d.vernacularName ?? d.scientificName} sci={`${d.scientificName} · ${d.region}`}
                     value={`${Math.abs(d.driftDeg).toFixed(1)}° ${d.driftDeg > 0 ? "N" : "S"}`} tone={d.driftDeg > 0 ? "warm" : "cool"} />
                 ))}
               </Section>
-              <Section title="Surging and fading" hint="Yesterday vs 7-day average">
+              <Section title="Surging and fading" hint="Share of detections, yesterday vs 7 days">
                 {insights?.movers.map((m) => (
                   <Row key={m.scientificName} thumb={thumbs[m.scientificName]} onClick={() => pick(m.scientificName)} name={m.vernacularName ?? m.scientificName} sci={m.scientificName}
                     value={`${m.ratio >= 1 ? "×" + m.ratio.toFixed(1) : "÷" + (1 / m.ratio).toFixed(1)}`} tone={m.ratio >= 1 ? "warm" : "cool"} />
                 ))}
               </Section>
-              <Section title="New arrivals" hint="First time in a 5° cell in 12 days">
+              <Section title="New arrivals" hint="First in 12 days, in a watched 5° cell">
                 {insights?.arrivals.map((a) => (
                   <Row key={`${a.scientificName}${a.cellLat}${a.cellLon}`} thumb={thumbs[a.scientificName]} onClick={() => pick(a.scientificName)} name={a.vernacularName ?? a.scientificName} sci={a.scientificName}
                     value={`${a.cellLat}°, ${a.cellLon}°`} tone="neutral" />
@@ -359,7 +369,7 @@ export default function WorldMap() {
               onChange={(e) => { setMvPlaying(false); setFrame(Number(e.target.value)); }} className="flex-1 min-w-0 accent-[#006cd9]" />
             <button onClick={() => { setMvPlaying(false); setFrame(null); }} className="text-xs text-slate-400 hover:text-white">Live</button>
             <span className="text-xs text-slate-300 tabular-nums whitespace-nowrap text-right hidden lg:inline">
-              {frames.length === 0 ? "No weekly history yet" : activeFrame ? `Week of ${new Date(activeFrame.week).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })} · ${activeFrame.total.toLocaleString()}` : `${frames.length} weeks available`}
+              {frames.length === 0 ? "No weekly history yet" : activeFrame ? `Week of ${new Date(activeFrame.week).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })} · ${activeFrame.index.toFixed(1)} per 1,000` : `${frames.length} weeks available`}
             </span>
           </>
         ) : (

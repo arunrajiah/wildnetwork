@@ -113,5 +113,35 @@ export async function refreshRollups(): Promise<{ days: string[]; cells: number;
     }
   }));
   for (const day of days) await rollupEventsDay(day);
+  await refreshDerived();
   return { days, cells: cells.length, rows, errors };
+}
+
+/**
+ * Keep the derived tables in step with species_daily:
+ * - species_weekly for the current and previous week (summed from daily, so no extra upstream queries)
+ * - effort_daily / effort_weekly: total detections of all species per cell, the denominator for effort correction
+ */
+export async function refreshDerived(): Promise<void> {
+  await sql`
+    INSERT INTO species_weekly (week, source_system, scientific_name, vernacular_name, cell_lat, cell_lon, count, high_conf_count)
+    SELECT date_trunc('week', day)::date, source_system, scientific_name, MIN(vernacular_name), cell_lat, cell_lon, SUM(count), SUM(high_conf_count)
+    FROM species_daily
+    WHERE day >= date_trunc('week', CURRENT_DATE)::date - 7
+    GROUP BY 1, 2, 3, 5, 6
+    ON CONFLICT (week, source_system, scientific_name, cell_lat, cell_lon) DO UPDATE SET
+      count = EXCLUDED.count, high_conf_count = EXCLUDED.high_conf_count, vernacular_name = EXCLUDED.vernacular_name
+  `;
+  await sql`
+    INSERT INTO effort_daily
+    SELECT day, cell_lat, cell_lon, SUM(count), COUNT(DISTINCT scientific_name) FROM species_daily
+    WHERE day >= CURRENT_DATE - 2 GROUP BY 1, 2, 3
+    ON CONFLICT (day, cell_lat, cell_lon) DO UPDATE SET detections = EXCLUDED.detections, species = EXCLUDED.species
+  `;
+  await sql`
+    INSERT INTO effort_weekly
+    SELECT week, cell_lat, cell_lon, SUM(count), COUNT(DISTINCT scientific_name) FROM species_weekly
+    WHERE week >= date_trunc('week', CURRENT_DATE)::date - 7 GROUP BY 1, 2, 3
+    ON CONFLICT (week, cell_lat, cell_lon) DO UPDATE SET detections = EXCLUDED.detections, species = EXCLUDED.species
+  `;
 }
