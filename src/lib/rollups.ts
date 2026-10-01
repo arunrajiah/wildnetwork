@@ -99,3 +99,19 @@ export async function rollupEventsDay(day: string): Promise<void> {
       count = EXCLUDED.count, high_conf_count = EXCLUDED.high_conf_count, sites = EXCLUDED.sites, vernacular_name = EXCLUDED.vernacular_name
   `;
 }
+
+/** Refresh today's and yesterday's rollups from all sources. About a minute of work. */
+export async function refreshRollups(): Promise<{ days: string[]; cells: number; rows: number; errors: number }> {
+  const days = [0, 1].map((d) => new Date(Date.now() - d * 86400_000).toISOString().slice(0, 10));
+  const cells = await birdweatherCells();
+  let rows = 0, errors = 0;
+  const jobs = days.flatMap((day) => cells.map((cell) => ({ cell, day })));
+  await Promise.all(Array.from({ length: 8 }, async () => {
+    while (jobs.length) {
+      const j = jobs.shift()!;
+      try { rows += await rollupBirdweatherCellDay(j.cell, j.day); } catch { errors++; }
+    }
+  }));
+  for (const day of days) await rollupEventsDay(day);
+  return { days, cells: cells.length, rows, errors };
+}

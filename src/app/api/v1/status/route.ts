@@ -1,13 +1,14 @@
 import { after } from "next/server";
 import { connectors, runConnector } from "@/lib/connectors";
 import { sql } from "@/lib/db";
+import { refreshRollups } from "@/lib/rollups";
 
 export const maxDuration = 300;
 
 /** Live health: last connector runs and totals, for the top-bar status dot. */
 export async function GET() {
   const [pulls, totals] = await Promise.all([
-    sql`SELECT connector, last_run_at, last_count, last_error FROM pull_state WHERE connector <> '_visit_lock' ORDER BY connector`,
+    sql`SELECT connector, last_run_at, last_count, last_error FROM pull_state WHERE connector NOT IN ('_visit_lock', '_rollup_lock') ORDER BY connector`,
     sql`SELECT (SELECT COUNT(*) FROM events WHERE event_start > now() - interval '1 hour') AS events_1h,
                (SELECT COUNT(*) FROM deployments) AS sensors,
                (SELECT SUM(count) FROM species_daily) AS detections,
@@ -25,6 +26,14 @@ export async function GET() {
       if (claimed.length) await Promise.all(Object.values(connectors).map(runConnector));
     });
   }
+  // Hourly rollups ride on the same trigger, with their own lock, so any uptime pinger keeps insights fresh.
+  after(async () => {
+    const claimed = await sql`
+      INSERT INTO pull_state (connector, last_run_at) VALUES ('_rollup_lock', now())
+      ON CONFLICT (connector) DO UPDATE SET last_run_at = now() WHERE pull_state.last_run_at < now() - interval '55 minutes'
+      RETURNING connector`;
+    if (claimed.length) await refreshRollups();
+  });
   return Response.json({
     live: newest > Date.now() - 15 * 60_000,
     lastPullAt: newest ? new Date(newest).toISOString() : null,
