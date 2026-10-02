@@ -47,7 +47,7 @@ export default function AboutPanel() {
         <p>
           No account, no ads, no tracking by default. If you choose &quot;Allow&quot; when asked, Google Analytics counts your visit and which features you use,
           so the project can show funders and researchers that it is used. Decline and nothing is sent to Google. To change your mind, clear this site&apos;s
-          data in your browser and you will be asked again.
+          data in your browser and you will be asked again. If you use the Ask box, your question is sent to an AI model provider and kept for 30 days with a scrambled form of your address.
         </p>
       </section>
 

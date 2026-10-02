@@ -6,6 +6,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ICON_IMAGE, registerIcons } from "@/lib/mapIcons";
 import AboutPanel from "./AboutPanel";
+import AskPanel from "./AskPanel";
 import { track } from "./Analytics";
 import SpeciesPanel, { type SpeciesDetail } from "./SpeciesPanel";
 
@@ -22,7 +23,7 @@ interface Insights {
 }
 
 interface Movement { scientificName: string; frames: { week: string; total: number; index: number; cells: [number, number, number, number][]; centroids: { region: string; n: number; lat: number; lon: number }[] }[] }
-interface Status { live: boolean; lastPullAt: string | null; events1h: number; sensors: number; detections: number; species: number }
+interface Status { ask?: boolean; live: boolean; lastPullAt: string | null; events1h: number; sensors: number; detections: number; species: number }
 
 const CLASSES: { key: string; label: string }[] = [
   { key: "all", label: "All" }, { key: "avian", label: "Birds" }, { key: "bat", label: "Bats" },
@@ -51,7 +52,7 @@ export default function WorldMap() {
   const [playhead, setPlayhead] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const [thumbs, setThumbs] = useState<Record<string, string | null>>({});
-  const [tab, setTab] = useState<"now" | "feed" | "about" | null>("now");
+  const [tab, setTab] = useState<"now" | "feed" | "ask" | "about" | null>("now");
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState("all");
   const [results, setResults] = useState<Species[]>([]);
@@ -354,6 +355,7 @@ export default function WorldMap() {
       <nav className="absolute left-0 top-11 bottom-0 w-[4.375rem] bg-black/80 backdrop-blur-xl border-r border-white/10 flex flex-col items-center py-2 gap-1 z-20">
         <RailButton label="Now" active={tab === "now" && !species} onClick={() => { setTab("now"); selectSpecies(null); }} icon={<path d="M3 12h4l3-8 4 16 3-8h4" />} />
         <RailButton label="Feed" active={tab === "feed" && !species} onClick={() => { setTab("feed"); selectSpecies(null); }} icon={<><path d="M4 6h16M4 12h16M4 18h10" /></>} />
+        {status?.ask && <RailButton label="Ask" active={tab === "ask" && !species} onClick={() => { setTab("ask"); selectSpecies(null); }} icon={<><path d="M4 5h16v11H9l-5 4z" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.4M12 15.5h.01" /></>} />}
         <RailButton label="About" active={tab === "about" && !species} onClick={() => { setTab("about"); selectSpecies(null); }} icon={<><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></>} />
         <Link href="/contribute" className="w-14 h-14 rounded-md flex flex-col items-center justify-center gap-1 text-[10px] text-slate-400 hover:bg-white/5 hover:text-slate-200">
           <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /><circle cx="12" cy="12" r="9" /></svg>
@@ -374,6 +376,8 @@ export default function WorldMap() {
             <SpeciesPanel name={species} onClose={() => selectSpecies(null)} />
           ) : tab === "about" ? (
             <AboutPanel />
+          ) : tab === "ask" ? (
+            <AskPanel onPick={pick} />
           ) : tab === "feed" ? (
             <div className="flex-1 overflow-y-auto">
               <div className="px-4 py-2 text-[11px] text-slate-500 border-b border-white/5">{loading ? "Loading latest detections" : `Latest detections · ${events.features.length.toLocaleString()}`} in the last {hours < 24 ? hours + "h" : hours / 24 + "d"}</div>

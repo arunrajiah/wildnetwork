@@ -157,7 +157,7 @@ export default function Methods() {
         <H3><span id="words" className="scroll-mt-6">In words</span></H3>
         <p>
           The short text on each species panel, and &quot;This week in words&quot; on the map, are written by fixed rules from the numbers on this page. No sentence is
-          free text: each one appears only when its condition is met, and says nothing otherwise.
+          free text: each one appears only when its condition is met, and says nothing otherwise. (The Ask box is different and is described below.)
         </p>
         <ul className="mt-2 list-disc pl-5 space-y-2">
           <li><b>Recent movement.</b> The mean range centre of the last 3 days against the first 3 days of the window. Reported as a move when the difference is at least 2 degrees of latitude, with the distance at 111 km per degree. Written only when the species averages at least 50 detections a day (10 for classes other than birds) at both ends of the window, so a handful of stray detections cannot produce a move. The temperature change is added when daytime highs at the centre differ by 2°C or more.</li>
@@ -172,6 +172,19 @@ export default function Methods() {
           read too warm (Ruby-throated Hummingbird is shown as 28°C), and for a resident it describes when singing starts. These are descriptions of what happened
           together, not evidence that weather caused the movement.
         </p>
+
+        <H3><span id="ask" className="scroll-mt-6">Ask</span></H3>
+        <p>
+          The Ask box answers a question in plain language. It is the only part of the site written by an AI language model, and it is built so that the model
+          cannot bring in facts of its own.
+        </p>
+        <ul className="mt-2 list-disc pl-5 space-y-2">
+          <li><b>Four lookups, nothing else.</b> The model can search for a species, read one species&apos; summary and figures, read this week&apos;s changes, and list what is detected near a place. Each lookup reads the same public API as the map. It is instructed to state no number, date or place that a lookup did not return.</li>
+          <li><b>Geography is the one exception.</b> It may turn a place name into coordinates and name the region a set of coordinates falls in. That can be wrong, especially near borders.</li>
+          <li><b>It can still be wrong.</b> A language model can misread a figure, overstate a pattern or answer a slightly different question. Every answer lists which lookups it used and links the species, so the numbers can be checked on the species panel.</li>
+          <li><b>What is kept.</b> The question, the answer and a scrambled form of the visitor&apos;s address, for 30 days, to limit abuse and to review answer quality. The question is sent to the model provider through the Vercel AI Gateway.</li>
+          <li><b>Limits.</b> Eight questions an hour per visitor, a daily total, and identical questions are answered from a 6 hour cache.</li>
+        </ul>
 
         <Src files={[["src/app/api/v1/insights/route.ts", "insights"], ["src/app/api/v1/species/%5Bname%5D/route.ts", "species"], ["src/app/api/v1/species/%5Bname%5D/movement/route.ts", "movement"]]} />
 
@@ -230,6 +243,7 @@ export default function Methods() {
 
         <H2 id="changes">7. Changes</H2>
         <ul className="mt-2 list-disc pl-5 space-y-1">
+          <li><b>0.6</b> (2 October 2026): Ask, a question box answered by a language model restricted to four lookups over the site&apos;s own data.</li>
           <li><b>0.5</b> (2 October 2026): text summaries written by fixed rules, including the temperature at which a species is first heard and its yearly span.</li>
           <li><b>0.4</b> (1 October 2026): taxon classes. Bats, amphibians, insects and mammals are labelled and effort corrected within their own class; higher level identifications are excluded from species measures.</li>
           <li><b>0.3</b> (1 October 2026): arrival, peak and departure weeks per species and cell, with a first validation against iNaturalist.</li>

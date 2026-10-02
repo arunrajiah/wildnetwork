@@ -113,6 +113,7 @@ All read endpoints are public and need no key.
 | `?group=bat` on events, species, insights, arrivals | Limit to one class: `avian`, `bat`, `amphibian`, `insect`, `mammal` |
 | `GET /api/v1/insights` | Moving, surging, fading, arriving (effort corrected, with the methods version) |
 | `GET /api/v1/media?names=A,B` | Species photo and description with attribution |
+| `POST /api/v1/ask` | A plain language answer from the site's own data (when switched on; 8 an hour per visitor) |
 | `GET /api/v1/status` | Freshness and totals |
 | `POST /api/v1/register` | A device key (5 per address per day) |
 | `POST /api/v1/events` | Ingest WDX events (key required) |
@@ -154,6 +155,8 @@ The public site runs this way, and it fits in free tiers to start.
 4. Build history: `DATABASE_URL=... pnpm exec tsx scripts/backfill.mts 14`. Rollups keep the database small: about 200 million detections fit in a few hundred thousand rows.
 5. Deploy the app to Vercel (`vercel --prod`) with `DATABASE_URL` and `CRON_SECRET` set.
 6. Schedule the pull and rollup endpoints (below). Neon scales to zero when idle, so the first request after a quiet period takes about a second.
+
+**Ask box (optional).** Set `ASK_ENABLED=true` to switch on plain language questions, answered by an AI model through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). On Vercel no key is needed, since the platform supplies a short lived token; the gateway does require a payment card on the account before it serves any request, including free models. `AI_GATEWAY_MODEL` picks the model (default: a free one). The model can only read this site's own data through four lookups, see [methods](https://wildnetwork.arunrajiah.com/methods#ask).
 
 **Analytics (optional).** Set `NEXT_PUBLIC_GA_ID` to a Google Analytics 4 measurement id. Visitors are asked first, and nothing is loaded from Google unless they allow it. Leave it unset for no analytics at all.
 

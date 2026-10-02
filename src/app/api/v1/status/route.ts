@@ -42,6 +42,7 @@ export async function GET() {
     if (daily.length) await recomputePhenology();
   });
   return Response.json({
+    ask: process.env.ASK_ENABLED === "true",
     live: newest > Date.now() - 15 * 60_000,
     lastPullAt: newest ? new Date(newest).toISOString() : null,
     connectors: pulls.map((p) => ({ name: p.connector, lastRunAt: p.last_run_at, lastCount: p.last_count, error: p.last_error })),

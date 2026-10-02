@@ -103,7 +103,8 @@ export async function GET(req: Request) {
     methods: METHODS_VERSION,
     group: group ?? "all",
     coverage: { from: meta[0].first_day, to: meta[0].last_day, species: Number(meta[0].species), detections: Number(meta[0].detections ?? 0) },
-    summary: overview(driftOut, moversOut),
+    // Within one class, "most of the drops are bats" would be trivially true, so that part is skipped.
+    summary: overview(driftOut, group ? [] : moversOut),
     movers: moversOut,
     drift: driftOut,
     arrivals: arrivals.map((r) => ({ scientificName: r.scientific_name, vernacularName: r.vernacular_name, group: r.grp, cellLat: r.cell_lat, cellLon: r.cell_lon, n: r.n })),
