@@ -10,6 +10,7 @@ export interface SpeciesDetail {
   sources: string[];
   methods?: string;
   group?: string;
+  story?: string[];
   daily: { day: string; n: number; high: number | null; effort: number; index: number; lat: number | null; lon: number | null; cells: number; weather: { tmax: number | null; tmin: number | null; precip: number | null; wind: number | null; windDir: number | null } | null }[];
   cells: { lat: number; lon: number; n: number; recent: number | null; earlier: number | null }[];
 }
@@ -98,6 +99,15 @@ export default function SpeciesPanel({ name, onClose }: { name: string; onClose:
       </div>
       <div className="px-4 flex flex-col gap-3">
       {media?.extract && <p className="text-xs text-slate-300 leading-relaxed">{media.extract.split(". ").slice(0, 2).join(". ").replace(/\.$/, "")}.{media.pageUrl && <> <a href={media.pageUrl} target="_blank" rel="noreferrer" className="text-cyan-500 hover:underline">Wikipedia</a></>}</p>}
+      {data.story && data.story.length > 0 && (
+        <section aria-label="In words" className="rounded-md border border-white/10 bg-white/5 px-3 py-2.5">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">In words</h3>
+          <ul className="space-y-1.5 text-[13px] leading-relaxed text-slate-200">
+            {data.story.map((line) => <li key={line}>{line}</li>)}
+          </ul>
+          <p className="mt-1.5 text-[11px] text-slate-500">Written from the numbers below by fixed rules. <Link href="/methods#words" className="text-cyan-500 hover:underline">How</Link>.</p>
+        </section>
+      )}
       <dl className="grid grid-cols-3 gap-2 text-xs">
         <Stat label="Detections, 30d" value={total.toLocaleString()} />
         <Stat label="Range centre drift" value={drift == null ? "n/a" : `${Math.abs(drift).toFixed(1)}° ${drift > 0 ? "north" : "south"}`} />

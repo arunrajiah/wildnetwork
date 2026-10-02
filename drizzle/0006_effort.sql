@@ -16,9 +16,5 @@ CREATE TABLE IF NOT EXISTS effort_weekly (
   species    integer NOT NULL,
   PRIMARY KEY (week, cell_lat, cell_lon)
 );
-INSERT INTO effort_daily
-  SELECT day, cell_lat, cell_lon, SUM(count), COUNT(DISTINCT scientific_name) FROM species_daily GROUP BY 1, 2, 3
-  ON CONFLICT (day, cell_lat, cell_lon) DO UPDATE SET detections = EXCLUDED.detections, species = EXCLUDED.species;
-INSERT INTO effort_weekly
-  SELECT week, cell_lat, cell_lon, SUM(count), COUNT(DISTINCT scientific_name) FROM species_weekly GROUP BY 1, 2, 3
-  ON CONFLICT (week, cell_lat, cell_lon) DO UPDATE SET detections = EXCLUDED.detections, species = EXCLUDED.species;
+-- The initial backfill that lived here was removed: effort is keyed by class since 0008 and is rebuilt by
+-- `pnpm classify` (classifyAll) and kept current by refreshDerived(). Migrations must stay safe to re-run.

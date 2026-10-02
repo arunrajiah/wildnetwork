@@ -14,6 +14,7 @@ setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 type FC = GeoJSON.FeatureCollection<GeoJSON.Geometry, Record<string, unknown>>;
 interface Species { scientificName: string; vernacularName: string | null; count: number; deployments: number }
 interface Insights {
+  summary?: string[];
   coverage: { from: string; to: string; species: number; detections: number };
   movers: { scientificName: string; vernacularName: string | null; yesterday: number; avg7: number; ratio: number }[];
   drift: { scientificName: string; vernacularName: string | null; region: string; driftDeg: number; latNow: number; n: number }[];
@@ -400,6 +401,14 @@ export default function WorldMap() {
                   {CLASSES.find((c) => c.key === group)?.label} are measured against other {CLASSES.find((c) => c.key === group)?.label.toLowerCase()} only, from the stations able to detect them.
                   Coverage is thin, so treat these as early signals. <Link href="/methods#classes" className="text-cyan-500 hover:underline">How this works</Link>.
                 </p>
+              )}
+              {insights?.summary && insights.summary.length > 0 && (
+                <section aria-label="This week in words" className="rounded-md border border-white/10 bg-white/5 px-3 py-2.5">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">This week in words</h3>
+                  <ul className="space-y-1.5 text-[13px] leading-relaxed text-slate-200">
+                    {insights.summary.map((line) => <li key={line}>{line}</li>)}
+                  </ul>
+                </section>
               )}
               <Section title="Moving" hint="Range centre shift per continent, effort corrected">
                 {insights?.drift.map((d) => (

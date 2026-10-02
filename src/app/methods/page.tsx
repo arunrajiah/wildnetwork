@@ -15,7 +15,7 @@ export default function Methods() {
       <div className="mx-auto max-w-3xl px-5 py-10 text-[15px] leading-relaxed">
         <Link href="/" className="text-sm text-cyan-400 hover:underline">← Back to the map</Link>
         <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-100">Methods</h1>
-        <p className="mt-1 text-sm text-slate-500">Version {METHODS_VERSION} · updated 1 October 2026</p>
+        <p className="mt-1 text-sm text-slate-500">Version {METHODS_VERSION} · updated 2 October 2026</p>
 
         <p className="mt-6">
           This page states exactly how each number on WildNetwork is produced, and where it can mislead. If you plan to use these measures in research,
@@ -152,6 +152,25 @@ export default function Methods() {
           Daily maximum and minimum temperature, precipitation and wind from the ERA5 reanalysis (Open-Meteo), taken at the species&apos; range centre for that
           day, rounded to 1 degree. The correlation shown is Pearson&apos;s r between the daily index and daily maximum temperature over the window.
         </p>
+        <H3><span id="words" className="scroll-mt-6">In words</span></H3>
+        <p>
+          The short text on each species panel, and &quot;This week in words&quot; on the map, are written by fixed rules from the numbers on this page. No sentence is
+          free text: each one appears only when its condition is met, and says nothing otherwise.
+        </p>
+        <ul className="mt-2 list-disc pl-5 space-y-2">
+          <li><b>Recent movement.</b> The mean range centre of the last 3 days against the first 3 days of the window. Reported as a move when the difference is at least 2 degrees of latitude, with the distance at 111 km per degree. The temperature change is added when daytime highs at the centre differ by 2°C or more.</li>
+          <li><b>First heard where highs are around X°C.</b> For up to 50 of the species&apos; best sampled cells with an arrival date, the mean daily maximum temperature at the cell centre during the arrival week (ERA5 via Open-Meteo). The sentence gives the median and the middle half across cells, from at least 5 cells. If that middle half is within 6°C across 15 degrees of latitude or more, it adds that timing follows temperature; if it is wider than 10°C, that temperature alone does not explain it.</li>
+          <li><b>The yearly span.</b> The lowest and highest weekly range centre in the continent with most detections, using only weeks when the species reaches a tenth of its peak week, so stray detections out of season are ignored. Needs 8 such weeks and a span of 8 degrees or more.</li>
+          <li><b>Rain and wind.</b> The mean relative frequency on days with 5 mm of rain or more against days with under 1 mm, and on days with gusts of 30 km/h or more against days under 20 km/h, at the range centre. Needs 3 days in each group and a difference of 15 percent or more.</li>
+          <li><b>This week in words.</b> Counts within the listed species only (at most 12 per list): how many of a continent&apos;s fastest movers head the same way, and whether one class makes up at least half of the biggest drops or surges.</li>
+        </ul>
+        <p className="mt-3">
+          Cautions. Rain and wind reduce what a microphone picks up, so fewer detections in bad weather is partly the instrument and not the animal; the text says so
+          whenever it reports them. The temperature at first hearing inherits every limit of the arrival dates: for a species that is quiet when it arrives it will
+          read too warm (Ruby-throated Hummingbird is shown as 28°C), and for a resident it describes when singing starts. These are descriptions of what happened
+          together, not evidence that weather caused the movement.
+        </p>
+
         <Src files={[["src/app/api/v1/insights/route.ts", "insights"], ["src/app/api/v1/species/%5Bname%5D/route.ts", "species"], ["src/app/api/v1/species/%5Bname%5D/movement/route.ts", "movement"]]} />
 
         <H2 id="check">4. A worked check</H2>
@@ -209,6 +228,7 @@ export default function Methods() {
 
         <H2 id="changes">7. Changes</H2>
         <ul className="mt-2 list-disc pl-5 space-y-1">
+          <li><b>0.5</b> (2 October 2026): text summaries written by fixed rules, including the temperature at which a species is first heard and its yearly span.</li>
           <li><b>0.4</b> (1 October 2026): taxon classes. Bats, amphibians, insects and mammals are labelled and effort corrected within their own class; higher level identifications are excluded from species measures.</li>
           <li><b>0.3</b> (1 October 2026): arrival, peak and departure weeks per species and cell, with a first validation against iNaturalist.</li>
           <li><b>0.2</b> (1 October 2026): effort correction. All measures use share of detections; range centres use only cells observed in both periods; arrivals require a watched cell.</li>

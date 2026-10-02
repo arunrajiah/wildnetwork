@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { METHODS_VERSION, minEffortDay } from "@/lib/methods";
+import { getClimate, getYearSpan, speciesStory, type DayPoint } from "@/lib/story";
 
 export const revalidate = 600;
 
@@ -86,12 +87,18 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
     } catch { /* weather is optional */ }
   }));
 
+  const days: DayPoint[] = daily.map((d) => ({ day: String(d.day), n: d.n, index: Number(d.idx), lat: d.lat == null ? null : Number(d.lat), weather: weather[String(d.day)] ?? null }));
+  const [climate, span] = await Promise.all([getClimate(name).catch(() => null), getYearSpan(name, grp).catch(() => null)]);
+
   return Response.json({
     scientificName: name,
     vernacularName: info[0]?.vernacular_name ?? null,
     sources: info[0]?.sources ?? [],
     methods: METHODS_VERSION,
     group: grp,
+    // Plain language summary; each sentence comes from a fixed template, see /methods.
+    story: speciesStory(name, days, climate, span),
+    arrivalTemperature: climate,
     daily: daily.map((d) => ({ day: d.day, n: d.n, high: d.high, effort: Number(d.effort), index: Number(d.idx), lat: d.lat == null ? null : Number(d.lat), lon: d.lon == null ? null : Number(d.lon), cells: d.cells, weather: weather[String(d.day)] ?? null })),
     // recent / earlier are per-1,000 shares; null when the cell was not observed enough in that period
     cells: cells.map((c) => ({ lat: c.cell_lat, lon: c.cell_lon, n: c.n, recent: c.recent == null ? null : Number(c.recent), earlier: c.earlier == null ? null : Number(c.earlier) })),

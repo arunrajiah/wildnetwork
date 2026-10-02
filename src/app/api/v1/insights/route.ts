@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import { overview } from "@/lib/story";
 import { GROUPS, METHODS_VERSION, MIN_CELL_DETECTIONS, REGION, minEffortDay, scaled, type Group } from "@/lib/methods";
 
 /**
@@ -96,12 +97,15 @@ export async function GET(req: Request) {
       SELECT MIN(sd.day)::text AS first_day, MAX(sd.day)::text AS last_day, COUNT(DISTINCT sd.scientific_name) AS species, SUM(sd.count) AS detections
       FROM species_daily sd ${group ? sql`JOIN species_group g ON g.scientific_name = sd.scientific_name AND g.grp = ${group}` : sql``}`,
   ]);
+  const driftOut = drift.map((r) => ({ scientificName: r.scientific_name as string, vernacularName: r.vernacular_name as string | null, group: r.grp as string, region: r.region as string, driftDeg: Number(r.drift_deg), latNow: Number(r.lat_now), n: r.n as number, cells: r.cells as number }));
+  const moversOut = movers.map((r) => ({ scientificName: r.scientific_name as string, vernacularName: r.vernacular_name as string | null, group: r.grp as string, yesterday: r.yesterday as number, avg7: r.avg7 as number, ratio: Number(r.ratio) }));
   return Response.json({
     methods: METHODS_VERSION,
     group: group ?? "all",
     coverage: { from: meta[0].first_day, to: meta[0].last_day, species: Number(meta[0].species), detections: Number(meta[0].detections ?? 0) },
-    movers: movers.map((r) => ({ scientificName: r.scientific_name, vernacularName: r.vernacular_name, group: r.grp, yesterday: r.yesterday, avg7: r.avg7, ratio: Number(r.ratio) })),
-    drift: drift.map((r) => ({ scientificName: r.scientific_name, vernacularName: r.vernacular_name, group: r.grp, region: r.region, driftDeg: Number(r.drift_deg), latNow: Number(r.lat_now), n: r.n, cells: r.cells })),
+    summary: overview(driftOut, moversOut),
+    movers: moversOut,
+    drift: driftOut,
     arrivals: arrivals.map((r) => ({ scientificName: r.scientific_name, vernacularName: r.vernacular_name, group: r.grp, cellLat: r.cell_lat, cellLon: r.cell_lon, n: r.n })),
   }, { headers: { "cache-control": "public, s-maxage=300, stale-while-revalidate=600" } });
 }
