@@ -103,7 +103,7 @@ export async function rollupGbifCellWeek(cell: { lat: number; lon: number }, wee
   });
   if (!rows.length) return 0;
   await upsertGroups(rows.map((r) => ({ name: r.scientific_name, grp: r.grp })));
-  const out = rows.map(({ grp: _g, ...r }) => r);
+  const out = rows.map((r) => ({ week: r.week, source_system: r.source_system, scientific_name: r.scientific_name, vernacular_name: r.vernacular_name, cell_lat: r.cell_lat, cell_lon: r.cell_lon, count: r.count, high_conf_count: r.high_conf_count }));
   await sql`
     INSERT INTO species_weekly ${sql(out)}
     ON CONFLICT (week, source_system, scientific_name, cell_lat, cell_lon) DO UPDATE SET
