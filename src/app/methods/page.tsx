@@ -3,7 +3,8 @@ import Link from "next/link";
 import { METHODS_VERSION, MIN_CELL_DETECTIONS, MIN_EFFORT_DAY, MIN_EFFORT_WEEK, SMALL_CLASS } from "@/lib/methods";
 
 export const metadata: Metadata = {
-  title: "Methods · WildNetwork",
+  title: "Methods: how wildlife movement is measured",
+  alternates: { canonical: "/methods" },
   description: "How WildNetwork measures wildlife movement, how it corrects for observation effort, and what its limits are.",
 };
 

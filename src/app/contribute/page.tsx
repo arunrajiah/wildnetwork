@@ -3,7 +3,8 @@ import Link from "next/link";
 import CopyBlock from "@/components/CopyBlock";
 
 export const metadata: Metadata = {
-  title: "Contribute data · WildNetwork",
+  title: "Contribute data: connect a bird station, bat detector or camera trap",
+  alternates: { canonical: "/contribute" },
   description: "How to send detections from a bird station, bat detector or camera trap to WildNetwork, whether you already have a device or want to set one up.",
 };
 

@@ -298,6 +298,13 @@ export default function WorldMap() {
     setEvents(EMPTY); setLoading(true);
   };
   const pick = (name: string) => { selectSpecies(name); setTab("now"); track("select_species", { species: name }); };
+  // Deep link from the species pages: /?species=Hirundo rustica
+  useEffect(() => {
+    const name = new URLSearchParams(window.location.search).get("species");
+    if (!name) return;
+    const id = setTimeout(() => { setSpecies(name); setTab("now"); }, 0);
+    return () => clearTimeout(id);
+  }, []);
   const flyTo = (f: GeoJSON.Feature<GeoJSON.Geometry, Record<string, unknown>>) => {
     const c = (f.geometry as GeoJSON.Point).coordinates as [number, number];
     mapRef.current?.flyTo({ center: c, zoom: Math.max(mapRef.current.getZoom(), 6), duration: 900 });

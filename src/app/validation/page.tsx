@@ -3,7 +3,8 @@ import Link from "next/link";
 import data from "@/data/validation.json";
 
 export const metadata: Metadata = {
-  title: "Validation · WildNetwork",
+  title: "Validation: arrival dates against human observers",
+  alternates: { canonical: "/validation" },
   description: "How WildNetwork's arrival dates compare with independent human observations, including where they are wrong.",
 };
 
