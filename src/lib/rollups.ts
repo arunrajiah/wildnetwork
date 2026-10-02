@@ -145,6 +145,8 @@ export async function refreshDerived(days = 7): Promise<void> {
     SELECT date_trunc('week', day)::date, source_system, scientific_name, MIN(vernacular_name), cell_lat, cell_lon, SUM(count), SUM(high_conf_count)
     FROM species_daily
     WHERE day >= date_trunc('week', CURRENT_DATE)::date - 7
+      -- GBIF weeks come from its facets (src/lib/gbif.ts) and already contain iNaturalist's licensed records
+      AND source_system NOT IN ('gbif', 'inaturalist')
     GROUP BY 1, 2, 3, 5, 6
     ON CONFLICT (week, source_system, scientific_name, cell_lat, cell_lon) DO UPDATE SET
       count = EXCLUDED.count, high_conf_count = EXCLUDED.high_conf_count, vernacular_name = EXCLUDED.vernacular_name

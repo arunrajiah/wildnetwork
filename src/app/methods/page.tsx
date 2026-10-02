@@ -33,6 +33,7 @@ export default function Methods() {
         </p>
         <ul className="mt-2 list-disc pl-5 space-y-1">
           <li><b>Acoustic detections</b> from BirdWeather community stations: birds, frogs, insects and some mammals identified by BirdNET, and bats identified by BirdWeather&apos;s ultrasonic classifier. This was the large majority of the data and is paused at BirdWeather&apos;s request.</li>
+          <li><b>Published observations</b> through <a href="https://www.gbif.org" className="text-cyan-400 hover:underline">GBIF</a>, limited to records their publishers released under CC0 or CC BY 4.0 (mostly national recording schemes such as Artportalen, the Norwegian Species Observation Service and Arter.dk). Live records are those GBIF indexed in the last days; the weekly history is counted straight from GBIF per cell and week, and includes iNaturalist&apos;s licensed records. Each dataset is cited by DOI in the credits.</li>
           <li><b>Community observations</b> from iNaturalist, limited to CC0 and CC BY records.</li>
           <li><b>Device detections</b> pushed by contributors running wdx-agent on BirdNET-Pi, BirdNET-Go or camera traps.</li>
         </ul>
@@ -247,6 +248,7 @@ export default function Methods() {
 
         <H2 id="changes">7. Changes</H2>
         <ul className="mt-2 list-disc pl-5 space-y-1">
+          <li><b>0.7</b> (3 October 2026): BirdWeather paused at their request. GBIF added as a source (CC0 and CC BY records only); weekly history for GBIF and iNaturalist now comes from GBIF&apos;s own counts per cell and week rather than from the live window. Thresholds unchanged, so with far fewer detections most cells are &quot;not watched&quot;.</li>
           <li><b>0.6</b> (2 October 2026): Ask, a question box answered by a language model restricted to four lookups over the site&apos;s own data.</li>
           <li><b>0.5</b> (2 October 2026): text summaries written by fixed rules, including the temperature at which a species is first heard and its yearly span.</li>
           <li><b>0.4</b> (1 October 2026): taxon classes. Bats, amphibians, insects and mammals are labelled and effort corrected within their own class; higher level identifications are excluded from species measures.</li>

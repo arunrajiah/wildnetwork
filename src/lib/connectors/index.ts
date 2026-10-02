@@ -2,11 +2,12 @@ import { sql } from "@/lib/db";
 import { ingestEvents } from "@/lib/wdx/ingest";
 import { validateWdx } from "@/lib/wdx/validate";
 import { birdweather } from "./birdweather";
+import { gbif } from "./gbif";
 import { inaturalist } from "./inaturalist";
 import { BIRDWEATHER_PAUSED } from "@/lib/sources";
 import type { PullConnector } from "./types";
 
-export const connectors: Record<string, PullConnector> = BIRDWEATHER_PAUSED ? { inaturalist } : { birdweather, inaturalist };
+export const connectors: Record<string, PullConnector> = BIRDWEATHER_PAUSED ? { inaturalist, gbif } : { birdweather, inaturalist, gbif };
 
 export interface RunResult {
   connector: string;
@@ -49,8 +50,8 @@ export async function prune(): Promise<void> {
   // Bats are sparse and nocturnal, so they stay for a day; everything else from BirdWeather for 3 hours.
   await sql`DELETE FROM events e WHERE e.source_system = 'birdweather' AND e.event_start < now() - interval '3 hours'
     AND (e.event_start < now() - interval '24 hours' OR NOT EXISTS (SELECT 1 FROM species_group g WHERE g.scientific_name = e.scientific_name AND g.grp = 'bat'))`;
-  await sql`DELETE FROM events WHERE source_system = 'inaturalist' AND event_start < now() - interval '7 days'`;
-  await sql`DELETE FROM events WHERE source_system NOT IN ('birdweather', 'inaturalist') AND event_start < now() - interval '30 days'`;
+  await sql`DELETE FROM events WHERE source_system IN ('inaturalist', 'gbif') AND event_start < now() - interval '7 days'`;
+  await sql`DELETE FROM events WHERE source_system NOT IN ('birdweather', 'inaturalist', 'gbif') AND event_start < now() - interval '30 days'`;
   await sql`DELETE FROM species_daily WHERE day < CURRENT_DATE - 28`;
 }
 

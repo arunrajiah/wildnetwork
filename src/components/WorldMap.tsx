@@ -35,7 +35,7 @@ const EMPTY: FC = { type: "FeatureCollection", features: [] };
 const STYLE = "https://tiles.openfreemap.org/styles/dark";
 const HOURS = [1, 3]; // the live window; longer history is in the weekly movement playback
 // Validated for the dark surface (dataviz validator): sources are categorical, change is diverging.
-const SOURCE_COLOR: unknown[] = ["match", ["get", "source"], "birdweather", "#0891b2", "inaturalist", "#65a30d", "#db2777"];
+const SOURCE_COLOR: unknown[] = ["match", ["get", "source"], "birdweather", "#0891b2", "inaturalist", "#65a30d", "gbif", "#f59e0b", "#db2777"];
 
 export default function WorldMap() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -78,7 +78,7 @@ export default function WorldMap() {
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const map = new MLMap({ container: containerRef.current, style: STYLE, center: [10, 25], zoom: 1.7, minZoom: 1.3, renderWorldCopies: false, attributionControl: false });
-    map.addControl(new AttributionControl({ compact: true, customAttribution: "iNaturalist (CC0/CC-BY) · WDX producers" }));
+    map.addControl(new AttributionControl({ compact: true, customAttribution: "GBIF publishers (CC0/CC BY) · iNaturalist (CC0/CC-BY) · WDX producers" }));
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     map.on("load", () => {
       map.addSource("cells", { type: "geojson", data: EMPTY });
@@ -449,7 +449,7 @@ export default function WorldMap() {
             </div>
           )}
           <div className="px-4 py-2 border-t border-white/5 text-[11px] text-slate-400 flex flex-wrap gap-x-3 gap-y-1">
-            <Legend color="#65a30d" label="iNaturalist" /><Legend color="#db2777" label="WDX devices" />
+            <Legend color="#f59e0b" label="GBIF" /><Legend color="#65a30d" label="iNaturalist" /><Legend color="#db2777" label="WDX devices" />
             <span className="text-slate-500">{deployments.features.length.toLocaleString()} sensors</span>
           </div>
         </aside>
@@ -471,7 +471,7 @@ export default function WorldMap() {
         ) : (
           <>
             <div className="text-slate-400 mb-1">{group === "bat" ? "Bat detections, last 24h" : `Detections, last ${hours}h (sample)`}</div>
-            <div className="flex flex-wrap gap-x-3 gap-y-0.5"><Legend color="#65a30d" label="iNaturalist" /><Legend color="#db2777" label="Devices" /><Legend color="#475569" label="Sensor" /></div>
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5"><Legend color="#f59e0b" label="GBIF" /><Legend color="#65a30d" label="iNaturalist" /><Legend color="#db2777" label="Devices" /><Legend color="#475569" label="Sensor" /></div>
           </>
         )}
       </div>

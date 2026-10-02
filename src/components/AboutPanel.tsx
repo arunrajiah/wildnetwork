@@ -1,3 +1,5 @@
+import GbifCredits from "@/components/GbifCredits";
+
 export default function AboutPanel() {
   return (
     <div className="p-5 text-sm text-slate-300 flex flex-col gap-5 overflow-y-auto h-full">
@@ -25,6 +27,7 @@ export default function AboutPanel() {
         <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Data</h3>
         <ul className="flex flex-col gap-1.5">
           <li><Link href="https://www.birdweather.com">BirdWeather</Link>: paused. At BirdWeather&apos;s request its data is not collected or shown while terms are agreed.</li>
+          <li><Link href="https://www.gbif.org">GBIF</Link>: observations published under CC0 or CC BY by national recording schemes and other publishers, cited below by dataset.</li>
           <li><Link href="https://www.inaturalist.org">iNaturalist</Link>: community observations, CC0 and CC BY licensed records only, credited to their observers.</li>
           <li><Link href="https://open-meteo.com">Open-Meteo</Link>: ERA5 reanalysis weather (CC BY 4.0).</li>
           <li><Link href="https://www.wikipedia.org">Wikipedia</Link> and Wikimedia Commons contributors: species photos and descriptions (CC BY-SA).</li>
@@ -41,6 +44,8 @@ export default function AboutPanel() {
           <Link href="https://www.earthranger.com">EarthRanger</Link> (Apache 2.0), the conservation platform from the Allen Institute for AI.
         </p>
       </section>
+
+      <GbifCredits />
 
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Privacy</h3>

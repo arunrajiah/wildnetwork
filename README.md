@@ -188,6 +188,7 @@ Stack: Next.js (App Router), TypeScript, Tailwind, MapLibre GL, Postgres with Po
 | Source | What | Terms |
 |---|---|---|
 | [BirdWeather](https://www.birdweather.com) | Acoustic detections from community stations | **Paused** at BirdWeather's request (2 October 2026): not collected, shown or served while terms are agreed |
+| [GBIF](https://www.gbif.org) | Observations published by national recording schemes and others | Only CC0 and CC BY 4.0 records are ingested; every dataset is cited by DOI |
 | [iNaturalist](https://www.inaturalist.org) | Community observations | Only CC0 and CC BY records are ingested; credit the observer |
 | WDX producers | Devices running wdx-agent or pushing directly | License chosen by each contributor, CC BY 4.0 by default |
 | [Open-Meteo](https://open-meteo.com) | ERA5 weather | CC BY 4.0 |

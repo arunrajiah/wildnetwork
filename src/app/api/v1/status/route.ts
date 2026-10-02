@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import { recomputePhenology } from "@/lib/phenology";
 import { refreshRollups } from "@/lib/rollups";
 import { BIRDWEATHER_PAUSED } from "@/lib/sources";
+import { refreshGbifWeekly } from "@/lib/gbif";
 
 export const maxDuration = 300;
 
@@ -41,6 +42,12 @@ export async function GET() {
       ON CONFLICT (connector) DO UPDATE SET last_run_at = now() WHERE pull_state.last_run_at < now() - interval '23 hours'
       RETURNING connector`;
     if (daily.length) await recomputePhenology();
+    // GBIF weekly history: the last 3 weeks, once every 6 hours, within the function's time budget.
+    const gb = await sql`
+      INSERT INTO pull_state (connector, last_run_at) VALUES ('_gbif_lock', now())
+      ON CONFLICT (connector) DO UPDATE SET last_run_at = now() WHERE pull_state.last_run_at < now() - interval '6 hours'
+      RETURNING connector`;
+    if (gb.length) await refreshGbifWeekly(3, 200_000);
   });
   return Response.json({
     ask: process.env.ASK_ENABLED === "true" && !BIRDWEATHER_PAUSED,
