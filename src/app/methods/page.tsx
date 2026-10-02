@@ -96,8 +96,10 @@ export default function Methods() {
         <p>The latitude and longitude around which the species is concentrated, weighted by share and not by count.</p>
         <Formula>centre latitude = Σ share(cell) × latitude(cell) ÷ Σ share(cell)</Formula>
         <p>
-          Cell positions are cell midpoints. Centres are computed <b>per continent</b> (six coarse regions split by longitude and latitude), so a species that
-          lives on two continents never gets a meaningless centre in the ocean between them.
+          Cell positions are cell midpoints. Two versions are used. On the species panel, the daily centre and the &quot;recent movement&quot; sentence use{" "}
+          <b>all observed cells worldwide</b>, which suits a migrant that crosses continents but makes the centre of a species living on several continents
+          a blend of them. The Moving list, the yearly span and the playback track are computed <b>per continent</b> (six coarse regions split by longitude
+          and latitude), so those never mix populations on different continents.
         </p>
 
         <H3>Moving</H3>
