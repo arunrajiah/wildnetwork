@@ -51,7 +51,10 @@ export const cellPolygon = (c: { lat: number; lon: number }) =>
 const taxa = new Map<number, { scientific_name: string; vernacular_name: string | null; grp: string }>();
 
 /** Species key -> name and class, cached in memory and in gbif_taxa. */
-export async function resolveTaxa(keys: number[], grp: string): Promise<void> {
+/** Class from GBIF's taxonomy: bats are the order Chiroptera, the rest are classes. */
+const grpOfTaxon = (t: { classKey?: number; orderKey?: number }) => (t.orderKey === 734 ? "bat" : CLASS_TAXA.find((c) => c.key === t.classKey)?.grp ?? "other");
+
+export async function resolveTaxa(keys: number[]): Promise<void> {
   const missing = keys.filter((k) => !taxa.has(k));
   if (missing.length) {
     const rows = await sql<{ species_key: number; scientific_name: string; vernacular_name: string | null; grp: string }[]>`
@@ -61,7 +64,8 @@ export async function resolveTaxa(keys: number[], grp: string): Promise<void> {
   const fetchKeys = missing.filter((k) => !taxa.has(k));
   await Promise.all(fetchKeys.map(async (k) => {
     try {
-      const s = await gbifJson<{ canonicalName?: string; scientificName: string; vernacularName?: string }>(`/species/${k}`, new URLSearchParams());
+      const s = await gbifJson<{ canonicalName?: string; scientificName: string; vernacularName?: string; classKey?: number; orderKey?: number }>(`/species/${k}`, new URLSearchParams());
+      const grp = grpOfTaxon(s);
       let vern = s.vernacularName ?? null;
       if (!vern) {
         const v = await gbifJson<{ results: { vernacularName: string; language?: string }[] }>(`/species/${k}/vernacularNames`, new URLSearchParams({ limit: "100" })).catch(() => null);
@@ -77,37 +81,34 @@ export async function resolveTaxa(keys: number[], grp: string): Promise<void> {
 export const taxon = (k: number) => taxa.get(k);
 
 /**
- * One cell, one week, one class: species counts straight from GBIF's facet, no records downloaded.
+ * One cell, one week, all classes in one query: species counts straight from GBIF's facet, no records downloaded.
  * Writes species_weekly rows with source_system 'gbif'. Returns rows written.
  */
-export async function rollupGbifCellWeek(cell: { lat: number; lon: number }, week: string, cls = CLASS_TAXA): Promise<number> {
+export async function rollupGbifCellWeek(cell: { lat: number; lon: number }, week: string): Promise<number> {
   const end = new Date(Date.parse(week) + 6 * 86400_000).toISOString().slice(0, 10);
-  let total = 0;
-  for (const c of cls) {
-    const p = baseParams();
-    p.set("taxonKey", String(c.key));
-    p.set("eventDate", `${week},${end}`);
-    p.set("geometry", cellPolygon(cell));
-    p.set("facet", "speciesKey");
-    p.set("facetLimit", "300");
-    p.set("limit", "0");
-    const j = await gbifJson<{ count: number; facets: { field: string; counts: { name: string; count: number }[] }[] }>("/occurrence/search", p);
-    const counts = j.facets?.[0]?.counts ?? [];
-    if (!counts.length) continue;
-    await resolveTaxa(counts.map((x) => Number(x.name)), c.grp);
-    const rows = counts.flatMap((x) => {
-      const t = taxon(Number(x.name));
-      return t ? [{ week, source_system: "gbif", scientific_name: t.scientific_name, vernacular_name: t.vernacular_name, cell_lat: cell.lat, cell_lon: cell.lon, count: x.count, high_conf_count: x.count }] : [];
-    });
-    if (!rows.length) continue;
-    await upsertGroups(rows.map((r) => ({ name: r.scientific_name, grp: c.grp })));
-    await sql`
-      INSERT INTO species_weekly ${sql(rows)}
-      ON CONFLICT (week, source_system, scientific_name, cell_lat, cell_lon) DO UPDATE SET
-        count = EXCLUDED.count, high_conf_count = EXCLUDED.high_conf_count, vernacular_name = COALESCE(EXCLUDED.vernacular_name, species_weekly.vernacular_name)`;
-    total += rows.length;
-  }
-  return total;
+  const p = baseParams();
+  for (const c of CLASS_TAXA) p.append("taxonKey", String(c.key));
+  p.set("eventDate", `${week},${end}`);
+  p.set("geometry", cellPolygon(cell));
+  p.set("facet", "speciesKey");
+  p.set("facetLimit", "800");
+  p.set("limit", "0");
+  const j = await gbifJson<{ count: number; facets: { field: string; counts: { name: string; count: number }[] }[] }>("/occurrence/search", p);
+  const counts = j.facets?.[0]?.counts ?? [];
+  if (!counts.length) return 0;
+  await resolveTaxa(counts.map((x) => Number(x.name)));
+  const rows = counts.flatMap((x) => {
+    const t = taxon(Number(x.name));
+    return t ? [{ week, source_system: "gbif", scientific_name: t.scientific_name, vernacular_name: t.vernacular_name, cell_lat: cell.lat, cell_lon: cell.lon, count: x.count, high_conf_count: x.count, grp: t.grp }] : [];
+  });
+  if (!rows.length) return 0;
+  await upsertGroups(rows.map((r) => ({ name: r.scientific_name, grp: r.grp })));
+  const out = rows.map(({ grp: _g, ...r }) => r);
+  await sql`
+    INSERT INTO species_weekly ${sql(out)}
+    ON CONFLICT (week, source_system, scientific_name, cell_lat, cell_lon) DO UPDATE SET
+      count = EXCLUDED.count, high_conf_count = EXCLUDED.high_conf_count, vernacular_name = COALESCE(EXCLUDED.vernacular_name, species_weekly.vernacular_name)`;
+  return out.length;
 }
 
 /** Cells with at least 10 licensed bird records in the last 90 days. About 2,000 count-only queries; refreshed when older than 30 days. */

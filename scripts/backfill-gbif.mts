@@ -13,7 +13,7 @@ for (let w = skip; w < skip + weeks; w++) {
   const week = new Date(monday.getTime() - w * 7 * 86400_000).toISOString().slice(0, 10);
   for (const cell of cells) jobs.push({ cell, week });
 }
-console.log(`${cells.length} cells x ${weeks} weeks = ${jobs.length} cell-weeks (4 class queries each)`);
+console.log(`${cells.length} cells x ${weeks} weeks = ${jobs.length} cell-weeks (one query each)`);
 let done = 0, rows = 0, errors = 0;
 const t0 = Date.now();
 await Promise.all(Array.from({ length: conc }, async () => {
