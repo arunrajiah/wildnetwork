@@ -24,18 +24,19 @@ export default function Contribute() {
 
         <h2 className="mt-8 mb-3 text-xl font-semibold text-slate-100">Where are you starting from?</h2>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Card href="#birdweather" title="My station is on BirdWeather" text="You are already included. Nothing to install." />
+          <Card href="#birdweather" title="My station is on BirdWeather" text="Not included for now. You can add it yourself." />
           <Card href="#have" title="I have a device" text="BirdNET-Pi, BirdNET-Go, a camera trap, a bat detector, or other software." />
           <Card href="#new" title="I want to set one up" text="What to buy and how to build a bird, bat or camera station." />
         </div>
 
-        <H2 id="birdweather">Already on BirdWeather? You are done</H2>
+        <H2 id="birdweather">On BirdWeather? You choose</H2>
         <p>
-          WildNetwork already reads BirdWeather&apos;s public network. If you have a BirdWeather PUC, or your BirdNET-Pi or BirdNET-Go station uploads to BirdWeather,
-          your detections are on the map and in every measure. <b>Do not install the agent as well:</b> the same detections would arrive twice and be counted twice.
+          WildNetwork does not take data from BirdWeather at the moment. BirdWeather asked us to pause while we agree terms that respect station owners&apos;
+          choices, so being on BirdWeather does not put your station on this map.
         </p>
         <p className="mt-3">
-          Not sure? Look for your station on <A href="https://app.birdweather.com">app.birdweather.com</A>. If it is there, you are included.
+          If you run BirdNET-Pi or BirdNET-Go and want your detections here, you can send them yourself with the agent below. That is your decision for your
+          own station, and you can stop at any time. A BirdWeather PUC cannot run the agent, so PUC stations are not included for now.
         </p>
 
         <H2 id="have">I have a device</H2>
@@ -106,7 +107,7 @@ curl -X POST ${SITE}/api/v1/events \\
           <><b>Connect it:</b> run the <a href="#birdnet-pi" className="text-cyan-400 hover:underline">one line install</a> above.</>,
         ]} />
         <p className="mt-3 text-sm text-slate-400">
-          Prefer something ready made? A <A href="https://www.birdweather.com">BirdWeather PUC</A> is a finished device that reports to BirdWeather, and so to WildNetwork, with nothing to build.
+          Prefer something ready made? A <A href="https://www.birdweather.com">BirdWeather PUC</A> is a finished device that reports to BirdWeather. It does not report to WildNetwork.
         </p>
 
         <H3 id="new-bat">A bat detector</H3>

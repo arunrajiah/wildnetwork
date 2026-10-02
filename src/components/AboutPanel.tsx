@@ -24,7 +24,7 @@ export default function AboutPanel() {
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Data</h3>
         <ul className="flex flex-col gap-1.5">
-          <li><Link href="https://www.birdweather.com">BirdWeather</Link>: live acoustic detections from thousands of community stations worldwide. Birds, frogs and insects through BirdNET, and bats from stations with ultrasonic microphones.</li>
+          <li><Link href="https://www.birdweather.com">BirdWeather</Link>: paused. At BirdWeather&apos;s request its data is not collected or shown while terms are agreed.</li>
           <li><Link href="https://www.inaturalist.org">iNaturalist</Link>: community observations, CC0 and CC BY licensed records only, credited to their observers.</li>
           <li><Link href="https://open-meteo.com">Open-Meteo</Link>: ERA5 reanalysis weather (CC BY 4.0).</li>
           <li><Link href="https://www.wikipedia.org">Wikipedia</Link> and Wikimedia Commons contributors: species photos and descriptions (CC BY-SA).</li>
@@ -60,7 +60,7 @@ export default function AboutPanel() {
         <pre className="mt-2 text-[11px] bg-black/50 border border-white/10 rounded p-2 overflow-x-auto text-slate-200"><code>curl -fsSL https://wildnetwork.arunrajiah.com/agent/install.sh | bash</code></pre>
         <p className="mt-2">
           Camera traps and bat detectors work too, and if you have no device yet, the guide shows what to get and how to build it:{" "}
-          <a href="/contribute" className="text-cyan-400 hover:underline">Contribute data</a>. Stations already on BirdWeather are included automatically.
+          <a href="/contribute" className="text-cyan-400 hover:underline">Contribute data</a>.
         </p>
       </section>
     </div>

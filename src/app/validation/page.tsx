@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import PausedNotice from "@/components/PausedNotice";
+import { BIRDWEATHER_PAUSED } from "@/lib/sources";
 import data from "@/data/validation.json";
 
 export const metadata: Metadata = {
@@ -17,6 +19,19 @@ const day = (s: string) => Date.parse(s) / 86400_000;
 const fmt = (s: string) => new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 export default function Validation() {
+  // The comparison was built on BirdWeather detections, which are off public display for now.
+  if (BIRDWEATHER_PAUSED) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-slate-300">
+        <div className="mx-auto max-w-3xl px-5 py-10 text-[15px] leading-relaxed">
+          <Link href="/methods" className="text-sm text-cyan-400 hover:underline">← Methods</Link>
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-100">Validation: arrival dates</h1>
+          <PausedNotice className="mt-6" />
+          <p className="mt-4">The validation compared arrival dates derived from BirdWeather detections with iNaturalist observations. It is withdrawn while that data is paused.</p>
+        </div>
+      </main>
+    );
+  }
   const lo = Math.min(...pairs.flatMap((p) => [day(p.ours), day(p.inat)])), hi = Math.max(...pairs.flatMap((p) => [day(p.ours), day(p.inat)]));
   const sx = (d: number) => PAD.l + ((d - lo) / (hi - lo)) * (W - PAD.l - PAD.r);
   const sy = (d: number) => H - PAD.b - ((d - lo) / (hi - lo)) * (H - PAD.t - PAD.b);

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import PausedNotice from "@/components/PausedNotice";
+import { BIRDWEATHER_PAUSED } from "@/lib/sources";
 import { sql } from "@/lib/db";
 import { speciesSlug } from "@/lib/site";
 
@@ -24,6 +26,7 @@ export default async function SpeciesIndex() {
       <div className="mx-auto max-w-3xl px-5 py-10 text-[15px] leading-relaxed">
         <Link href="/" className="text-sm text-cyan-400 hover:underline">← Back to the map</Link>
         <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-100">Species</h1>
+        {BIRDWEATHER_PAUSED && <PausedNotice className="mt-4" />}
         <p className="mt-3">
           {rows.length.toLocaleString("en-GB")} species have a full seasonal record so far. Each page shows where the species is being detected now, when it arrives in each region, and how its range moves with the weather.
         </p>

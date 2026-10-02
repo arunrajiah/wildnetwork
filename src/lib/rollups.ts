@@ -1,6 +1,8 @@
 import { sql } from "@/lib/db";
 import { GRP } from "@/lib/methods";
 
+import { BIRDWEATHER_PAUSED } from "@/lib/sources";
+
 const ENDPOINT = "https://app.birdweather.com/graphql";
 const CELL = 5;
 
@@ -41,6 +43,7 @@ export function rollupBirdweatherCellWeek(cell: { lat: number; lon: number }, we
 }
 
 async function rollupBirdweatherCell(cell: { lat: number; lon: number }, day: string, spanDays: 1 | 7): Promise<number> {
+  if (BIRDWEATHER_PAUSED) throw new Error("BirdWeather collection is paused (see src/lib/sources.ts)");
   const next = new Date(Date.parse(day) + spanDays * 86400_000).toISOString().slice(0, 10);
   const res = await fetch(ENDPOINT, {
     method: "POST",
@@ -105,7 +108,7 @@ export async function rollupEventsDay(day: string): Promise<void> {
 /** Refresh today's and yesterday's rollups from all sources. About a minute of work. */
 export async function refreshRollups(): Promise<{ days: string[]; cells: number; rows: number; errors: number }> {
   const days = [0, 1].map((d) => new Date(Date.now() - d * 86400_000).toISOString().slice(0, 10));
-  const cells = await birdweatherCells();
+  const cells = BIRDWEATHER_PAUSED ? [] : await birdweatherCells();
   let rows = 0, errors = 0;
   const jobs = days.flatMap((day) => cells.map((cell) => ({ cell, day })));
   await Promise.all(Array.from({ length: 8 }, async () => {

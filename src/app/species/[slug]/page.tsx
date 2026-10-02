@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import PausedNotice from "@/components/PausedNotice";
+import { BIRDWEATHER_PAUSED } from "@/lib/sources";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { sql } from "@/lib/db";
@@ -74,6 +76,7 @@ export default async function SpeciesPage({ params }: { params: Promise<{ slug: 
         </nav>
         <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-100">{title}</h1>
         {d.common && <p className="mt-1 text-slate-400 italic">{d.name}</p>}
+        {BIRDWEATHER_PAUSED && <PausedNotice className="mt-4" />}
 
         {d.media?.imageUrl && (
           <figure className="mt-6">

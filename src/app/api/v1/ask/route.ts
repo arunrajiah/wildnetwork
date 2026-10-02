@@ -1,10 +1,12 @@
+import { BIRDWEATHER_PAUSED } from "@/lib/sources";
 import { hashKey } from "@/lib/auth";
 import { answerQuestion } from "@/lib/ask";
 import { sql } from "@/lib/db";
 
 export const maxDuration = 60;
 
-const ENABLED = process.env.ASK_ENABLED === "true";
+// With BirdWeather paused there is too little data to answer from, so the box stays off.
+const ENABLED = process.env.ASK_ENABLED === "true" && !BIRDWEATHER_PAUSED;
 const PER_IP_PER_HOUR = 8;
 // Each question costs the model a few requests, so the default stays well inside a free daily quota.
 const PER_DAY_TOTAL = Number(process.env.ASK_DAILY_LIMIT ?? 150);

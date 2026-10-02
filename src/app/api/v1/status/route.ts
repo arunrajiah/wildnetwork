@@ -3,13 +3,14 @@ import { pullAll } from "@/lib/connectors";
 import { sql } from "@/lib/db";
 import { recomputePhenology } from "@/lib/phenology";
 import { refreshRollups } from "@/lib/rollups";
+import { BIRDWEATHER_PAUSED } from "@/lib/sources";
 
 export const maxDuration = 300;
 
 /** Live health: last connector runs and totals, for the top-bar status dot. */
 export async function GET() {
   const [pulls, totals] = await Promise.all([
-    sql`SELECT connector, last_run_at, last_count, last_error FROM pull_state WHERE connector NOT LIKE '!_%' ESCAPE '!' ORDER BY connector`,
+    sql`SELECT connector, last_run_at, last_count, last_error FROM pull_state WHERE connector NOT LIKE '!_%' ESCAPE '!' ${BIRDWEATHER_PAUSED ? sql`AND connector <> 'birdweather'` : sql``} ORDER BY connector`,
     sql`SELECT (SELECT COUNT(*) FROM events WHERE event_start > now() - interval '1 hour') AS events_1h,
                (SELECT COUNT(*) FROM deployments) AS sensors,
                (SELECT SUM(count) FROM species_daily) AS detections,
@@ -42,7 +43,8 @@ export async function GET() {
     if (daily.length) await recomputePhenology();
   });
   return Response.json({
-    ask: process.env.ASK_ENABLED === "true",
+    ask: process.env.ASK_ENABLED === "true" && !BIRDWEATHER_PAUSED,
+    paused: BIRDWEATHER_PAUSED ? ["birdweather"] : [],
     live: newest > Date.now() - 15 * 60_000,
     lastPullAt: newest ? new Date(newest).toISOString() : null,
     connectors: pulls.map((p) => ({ name: p.connector, lastRunAt: p.last_run_at, lastCount: p.last_count, error: p.last_error })),

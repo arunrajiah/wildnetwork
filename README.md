@@ -36,7 +36,7 @@ It is free, open source, and built so that anyone with a Raspberry Pi can contri
 
 ## Contribute data from your own device
 
-The step by step guide, for people who already have a device and for people starting from nothing, is at **[wildnetwork.arunrajiah.com/contribute](https://wildnetwork.arunrajiah.com/contribute)**. Stations that already report to BirdWeather are included automatically and should not install the agent as well.
+The step by step guide, for people who already have a device and for people starting from nothing, is at **[wildnetwork.arunrajiah.com/contribute](https://wildnetwork.arunrajiah.com/contribute)**. BirdWeather data is paused at BirdWeather's request while terms are agreed, so stations that report only to BirdWeather are not included.
 
 If you run BirdNET-Pi or BirdNET-Go on a Raspberry Pi:
 
@@ -187,7 +187,7 @@ Stack: Next.js (App Router), TypeScript, Tailwind, MapLibre GL, Postgres with Po
 
 | Source | What | Terms |
 |---|---|---|
-| [BirdWeather](https://www.birdweather.com) | Acoustic detections from community stations | Credit BirdWeather and its station owners |
+| [BirdWeather](https://www.birdweather.com) | Acoustic detections from community stations | **Paused** at BirdWeather's request (2 October 2026): not collected, shown or served while terms are agreed |
 | [iNaturalist](https://www.inaturalist.org) | Community observations | Only CC0 and CC BY records are ingested; credit the observer |
 | WDX producers | Devices running wdx-agent or pushing directly | License chosen by each contributor, CC BY 4.0 by default |
 | [Open-Meteo](https://open-meteo.com) | ERA5 weather | CC BY 4.0 |

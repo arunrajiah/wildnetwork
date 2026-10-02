@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import PausedNotice from "@/components/PausedNotice";
 import { METHODS_VERSION, MIN_CELL_DETECTIONS, MIN_EFFORT_DAY, MIN_EFFORT_WEEK, SMALL_CLASS } from "@/lib/methods";
 
 export const metadata: Metadata = {
@@ -18,6 +19,8 @@ export default function Methods() {
         <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-100">Methods</h1>
         <p className="mt-1 text-sm text-slate-500">Version {METHODS_VERSION} · updated 2 October 2026</p>
 
+        <PausedNotice className="mt-6" />
+
         <p className="mt-6">
           This page states exactly how each number on WildNetwork is produced, and where it can mislead. If you plan to use these measures in research,
           read the <a href="#limits" className="text-cyan-400 hover:underline">known limits</a> first. The code that computes everything is public and linked
@@ -29,7 +32,7 @@ export default function Methods() {
           A <b>detection</b> is one record that a species was identified at a place and time, by a classifier or a person. WildNetwork currently holds three kinds:
         </p>
         <ul className="mt-2 list-disc pl-5 space-y-1">
-          <li><b>Acoustic detections</b> from BirdWeather community stations: birds, frogs, insects and some mammals identified by BirdNET, and bats identified by BirdWeather&apos;s ultrasonic classifier. This is the large majority of the data.</li>
+          <li><b>Acoustic detections</b> from BirdWeather community stations: birds, frogs, insects and some mammals identified by BirdNET, and bats identified by BirdWeather&apos;s ultrasonic classifier. This was the large majority of the data and is paused at BirdWeather&apos;s request.</li>
           <li><b>Community observations</b> from iNaturalist, limited to CC0 and CC BY records.</li>
           <li><b>Device detections</b> pushed by contributors running wdx-agent on BirdNET-Pi, BirdNET-Go or camera traps.</li>
         </ul>

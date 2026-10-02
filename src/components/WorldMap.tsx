@@ -1,5 +1,6 @@
 "use client";
 
+import PausedNotice from "@/components/PausedNotice";
 import Link from "next/link";
 import { AttributionControl, Map as MLMap, NavigationControl, Popup, setWorkerUrl, type GeoJSONSource, type MapLayerMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -23,7 +24,7 @@ interface Insights {
 }
 
 interface Movement { scientificName: string; frames: { week: string; total: number; index: number; cells: [number, number, number, number][]; centroids: { region: string; n: number; lat: number; lon: number }[] }[] }
-interface Status { ask?: boolean; live: boolean; lastPullAt: string | null; events1h: number; sensors: number; detections: number; species: number }
+interface Status { ask?: boolean; paused?: string[]; live: boolean; lastPullAt: string | null; events1h: number; sensors: number; detections: number; species: number }
 
 const CLASSES: { key: string; label: string }[] = [
   { key: "all", label: "All" }, { key: "avian", label: "Birds" }, { key: "bat", label: "Bats" },
@@ -77,7 +78,7 @@ export default function WorldMap() {
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const map = new MLMap({ container: containerRef.current, style: STYLE, center: [10, 25], zoom: 1.7, minZoom: 1.3, renderWorldCopies: false, attributionControl: false });
-    map.addControl(new AttributionControl({ compact: true, customAttribution: "BirdWeather · iNaturalist (CC0/CC-BY) · WDX producers" }));
+    map.addControl(new AttributionControl({ compact: true, customAttribution: "iNaturalist (CC0/CC-BY) · WDX producers" }));
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     map.on("load", () => {
       map.addSource("cells", { type: "geojson", data: EMPTY });
@@ -379,6 +380,7 @@ export default function WorldMap() {
       {/* Panel */}
       {panelOpen && (
         <aside className="absolute left-[4.375rem] top-11 bottom-0 w-[24rem] max-w-[calc(100vw-4.375rem)] bg-slate-900/95 backdrop-blur-xl border-r border-white/10 flex flex-col z-10">
+          {status?.paused?.length ? <PausedNotice className="m-2 mb-0 shrink-0" /> : null}
           {species ? (
             <SpeciesPanel name={species} onClose={() => selectSpecies(null)} />
           ) : tab === "about" ? (
@@ -447,7 +449,7 @@ export default function WorldMap() {
             </div>
           )}
           <div className="px-4 py-2 border-t border-white/5 text-[11px] text-slate-400 flex flex-wrap gap-x-3 gap-y-1">
-            <Legend color="#0891b2" label="BirdWeather" /><Legend color="#65a30d" label="iNaturalist" /><Legend color="#db2777" label="WDX devices" />
+            <Legend color="#65a30d" label="iNaturalist" /><Legend color="#db2777" label="WDX devices" />
             <span className="text-slate-500">{deployments.features.length.toLocaleString()} sensors</span>
           </div>
         </aside>
@@ -469,7 +471,7 @@ export default function WorldMap() {
         ) : (
           <>
             <div className="text-slate-400 mb-1">{group === "bat" ? "Bat detections, last 24h" : `Detections, last ${hours}h (sample)`}</div>
-            <div className="flex flex-wrap gap-x-3 gap-y-0.5"><Legend color="#0891b2" label="BirdWeather" /><Legend color="#65a30d" label="iNaturalist" /><Legend color="#db2777" label="Devices" /><Legend color="#475569" label="Sensor" /></div>
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5"><Legend color="#65a30d" label="iNaturalist" /><Legend color="#db2777" label="Devices" /><Legend color="#475569" label="Sensor" /></div>
           </>
         )}
       </div>

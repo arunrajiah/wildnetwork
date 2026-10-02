@@ -3,12 +3,10 @@ import { ingestEvents } from "@/lib/wdx/ingest";
 import { validateWdx } from "@/lib/wdx/validate";
 import { birdweather } from "./birdweather";
 import { inaturalist } from "./inaturalist";
+import { BIRDWEATHER_PAUSED } from "@/lib/sources";
 import type { PullConnector } from "./types";
 
-export const connectors: Record<string, PullConnector> = {
-  birdweather,
-  inaturalist,
-};
+export const connectors: Record<string, PullConnector> = BIRDWEATHER_PAUSED ? { inaturalist } : { birdweather, inaturalist };
 
 export interface RunResult {
   connector: string;
