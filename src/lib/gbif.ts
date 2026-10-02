@@ -32,10 +32,17 @@ export function baseParams(): URLSearchParams {
   return p;
 }
 
+/** GBIF rate limits bursts (429). Retry with backoff; be polite rather than fast. */
 export async function gbifJson<T>(path: string, params: URLSearchParams): Promise<T> {
-  const res = await fetch(`${GBIF}${path}?${params}`, { headers: { "user-agent": UA, accept: "application/json" } });
-  if (!res.ok) throw new Error(`gbif ${res.status} ${path}`);
-  return (await res.json()) as T;
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`${GBIF}${path}?${params}`, { headers: { "user-agent": UA, accept: "application/json" } });
+    if (res.ok) return (await res.json()) as T;
+    if ((res.status === 429 || res.status >= 500) && attempt < 6) {
+      await new Promise((r) => setTimeout(r, Math.min(60_000, 1500 * 2 ** attempt)));
+      continue;
+    }
+    throw new Error(`gbif ${res.status} ${path}`);
+  }
 }
 
 export const cellPolygon = (c: { lat: number; lon: number }) =>
@@ -103,7 +110,7 @@ export async function rollupGbifCellWeek(cell: { lat: number; lon: number }, wee
   return total;
 }
 
-/** Cells with any licensed bird record in the last 90 days. About 2,000 count-only queries; refreshed when older than 30 days. */
+/** Cells with at least 10 licensed bird records in the last 90 days. About 2,000 count-only queries; refreshed when older than 30 days. */
 export async function gbifCells(force = false): Promise<{ lat: number; lon: number }[]> {
   const have = await sql<{ cell_lat: number; cell_lon: number; age: number }[]>`SELECT cell_lat, cell_lon, EXTRACT(EPOCH FROM now() - checked_at) AS age FROM gbif_cells`;
   if (have.length && !force && Math.max(...have.map((h) => Number(h.age))) < 30 * 86400) return have.map((h) => ({ lat: h.cell_lat, lon: h.cell_lon }));
@@ -112,14 +119,14 @@ export async function gbifCells(force = false): Promise<{ lat: number; lon: numb
   const jobs: { lat: number; lon: number }[] = [];
   for (let lat = -60; lat < 80; lat += CELL) for (let lon = -180; lon < 180; lon += CELL) jobs.push({ lat, lon });
   const found: { cell_lat: number; cell_lon: number; n: number }[] = [];
-  await Promise.all(Array.from({ length: 8 }, async () => {
+  await Promise.all(Array.from({ length: 3 }, async () => {
     while (jobs.length) {
       const c = jobs.shift()!;
       const p = baseParams();
       p.set("taxonKey", "212"); p.set("eventDate", `${since},${today}`); p.set("geometry", cellPolygon(c)); p.set("limit", "0");
       try {
         const j = await gbifJson<{ count: number }>("/occurrence/search", p);
-        if (j.count > 0) found.push({ cell_lat: c.lat, cell_lon: c.lon, n: j.count });
+        if (j.count >= 10) found.push({ cell_lat: c.lat, cell_lon: c.lon, n: j.count });
       } catch { /* a missed cell is picked up next refresh */ }
     }
   }));
@@ -142,7 +149,7 @@ export async function refreshGbifWeekly(weeks = 3, budgetMs = 240_000): Promise<
   const jobs = Array.from({ length: weeks }, (_, w) => new Date(monday.getTime() - w * 7 * 86400_000).toISOString().slice(0, 10)).flatMap((week) => cells.map((cell) => ({ cell, week })));
   const total = jobs.length;
   let rows = 0, errors = 0, done = 0;
-  await Promise.all(Array.from({ length: 4 }, async () => {
+  await Promise.all(Array.from({ length: 2 }, async () => {
     while (jobs.length && Date.now() - t0 < budgetMs) {
       const j = jobs.shift()!;
       try { rows += await rollupGbifCellWeek(j.cell, j.week); } catch { errors++; }

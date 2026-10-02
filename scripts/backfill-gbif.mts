@@ -1,11 +1,11 @@
-// Backfill species_weekly from GBIF facets. Usage: pnpm backfill:gbif [weeks=52] [concurrency=4] [skipWeeks=0]
+// Backfill species_weekly from GBIF facets. Usage: pnpm backfill:gbif [weeks=52] [concurrency=2] [skipWeeks=0] [rediscover]
 import { sql } from "../src/lib/db";
 import { gbifCells, rollupGbifCellWeek } from "../src/lib/gbif";
 
 const weeks = Number(process.argv[2] ?? 52);
-const conc = Number(process.argv[3] ?? 4);
+const conc = Number(process.argv[3] ?? 2);
 const skip = Number(process.argv[4] ?? 0);
-const cells = await gbifCells();
+const cells = await gbifCells(process.argv[5] === "rediscover");
 const now = new Date();
 const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - ((now.getUTCDay() + 6) % 7)));
 const jobs: { cell: { lat: number; lon: number }; week: string }[] = [];
