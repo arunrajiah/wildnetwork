@@ -93,12 +93,14 @@ export async function getYearSpan(name: string, grp: string): Promise<{ region: 
 const latText = (lat: number) => `${Math.abs(round(lat))}°${lat >= 0 ? "N" : "S"}`;
 
 /** Sentences for one species. Returns [] when nothing can be said with the stated minimums. */
-export function speciesStory(name: string, daily: DayPoint[], climate: Climate | null, span: Awaited<ReturnType<typeof getYearSpan>>): string[] {
+export function speciesStory(name: string, daily: DayPoint[], climate: Climate | null, span: Awaited<ReturnType<typeof getYearSpan>>, minDaily = 50): string[] {
   const out: string[] = [];
   const located = daily.filter((d) => d.lat != null);
 
   // 1. Recent movement and the weather it moved into.
-  if (located.length >= 8) {
+  // Needs enough detections at both ends: a centre computed from a few stray detections means nothing.
+  const enough = (ds: DayPoint[]) => mean(ds.map((d) => d.n)) >= minDaily;
+  if (located.length >= 8 && enough(located.slice(0, 3)) && enough(located.slice(-3))) {
     const head = located.slice(0, 3), tail = located.slice(-3);
     const dLat = mean(tail.map((d) => d.lat!)) - mean(head.map((d) => d.lat!));
     const t0 = head.map((d) => d.weather?.tmax).filter((v): v is number => v != null), t1 = tail.map((d) => d.weather?.tmax).filter((v): v is number => v != null);

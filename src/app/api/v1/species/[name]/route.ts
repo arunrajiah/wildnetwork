@@ -97,7 +97,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
     methods: METHODS_VERSION,
     group: grp,
     // Plain language summary; each sentence comes from a fixed template, see /methods.
-    story: speciesStory(name, days, climate, span),
+    story: speciesStory(name, days, climate, span, grp === "avian" ? 50 : 10),
     arrivalTemperature: climate,
     daily: daily.map((d) => ({ day: d.day, n: d.n, high: d.high, effort: Number(d.effort), index: Number(d.idx), lat: d.lat == null ? null : Number(d.lat), lon: d.lon == null ? null : Number(d.lon), cells: d.cells, weather: weather[String(d.day)] ?? null })),
     // recent / earlier are per-1,000 shares; null when the cell was not observed enough in that period
