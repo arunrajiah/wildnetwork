@@ -105,8 +105,8 @@ export async function rollupGbifCellWeek(cell: { lat: number; lon: number }, wee
 
 /** Cells with any licensed bird record in the last 90 days. About 2,000 count-only queries; refreshed when older than 30 days. */
 export async function gbifCells(force = false): Promise<{ lat: number; lon: number }[]> {
-  const have = await sql<{ cell_lat: number; cell_lon: number; age: number }[]>`SELECT cell_lat, cell_lon, EXTRACT(EPOCH FROM now() - MAX(checked_at)) OVER () AS age FROM gbif_cells`;
-  if (have.length && !force && Number(have[0].age) < 30 * 86400) return have.map((h) => ({ lat: h.cell_lat, lon: h.cell_lon }));
+  const have = await sql<{ cell_lat: number; cell_lon: number; age: number }[]>`SELECT cell_lat, cell_lon, EXTRACT(EPOCH FROM now() - checked_at) AS age FROM gbif_cells`;
+  if (have.length && !force && Math.max(...have.map((h) => Number(h.age))) < 30 * 86400) return have.map((h) => ({ lat: h.cell_lat, lon: h.cell_lon }));
   const since = new Date(Date.now() - 90 * 86400_000).toISOString().slice(0, 10);
   const today = new Date().toISOString().slice(0, 10);
   const jobs: { lat: number; lon: number }[] = [];
