@@ -18,6 +18,7 @@
     "classify": "tsx --env-file=.env.local scripts/classify.mts"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.87",
     "ai": "^7.0.127",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",

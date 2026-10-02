@@ -1,3 +1,4 @@
+import { google } from "@ai-sdk/google";
 import { generateText, isStepCount, tool } from "ai";
 import { z } from "zod";
 import { sql } from "@/lib/db";
@@ -10,6 +11,15 @@ import { METHODS_VERSION } from "@/lib/methods";
  */
 export const ASK_MODEL = process.env.AI_GATEWAY_MODEL ?? "inclusionai/ling-3.1-flash-free";
 const FALLBACKS = (process.env.AI_GATEWAY_FALLBACKS ?? "openai/gpt-oss-20b").split(",").map((s) => s.trim()).filter(Boolean);
+
+/**
+ * Two ways to reach a model, chosen by which credential the deployment has:
+ * - GOOGLE_GENERATIVE_AI_API_KEY set: Google's Gemini API directly. Its free tier needs no payment card, and without
+ *   billing enabled on the key's project a request over quota fails instead of costing anything.
+ * - otherwise: the Vercel AI Gateway (needs a card on the Vercel account even for free models).
+ */
+const GOOGLE_MODELS = (process.env.ASK_GOOGLE_MODELS ?? "gemini-flash-latest,gemini-flash-lite-latest").split(",").map((s) => s.trim()).filter(Boolean);
+export const usesGoogle = () => Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
 
 const CLASSES = ["avian", "bat", "amphibian", "insect", "mammal"] as const;
 const round = (x: number, d = 1) => Math.round(x * 10 ** d) / 10 ** d;
@@ -122,10 +132,7 @@ export async function answerQuestion(question: string, origin: string): Promise<
   const tools = askTools(origin, seen, used);
 
   const today = new Date().toISOString().slice(0, 10);
-  const result = await generateText({
-    model: ASK_MODEL,
-    providerOptions: { gateway: { models: FALLBACKS } },
-    instructions: `You answer questions about wildlife movement for WildNetwork, an open map built from community acoustic stations, camera traps and citizen observations. Today is ${today}.
+  const instructions = `You answer questions about wildlife movement for WildNetwork, an open map built from community acoustic stations, camera traps and citizen observations. Today is ${today}.
 
 Rules:
 - Use the tools for every fact. Never state a number, date, place or species behaviour that a tool did not return. If the tools do not cover the question, say plainly that this site's data cannot answer it.
@@ -133,19 +140,26 @@ Rules:
 - Detections are not counts of animals: one bird near a microphone can be detected many times. Say "detected" or "heard", never "there are N birds". Most data is acoustic and coverage is densest in Europe, North America and Australasia.
 - "First heard" dates are when a species is first heard regularly, which for residents means when singing starts.
 - Answer in at most 110 words of plain text, no markdown, no lists unless asked. Be specific: give the figures the tools returned.
-- If the question is not about wildlife, this site or its data, say in one sentence that you can only answer questions about the animals on this map.`,
-    prompt: question,
-    tools,
-    stopWhen: isStepCount(6),
-    maxOutputTokens: 500,
-    temperature: 0.2,
-  });
+- If the question is not about wildlife, this site or its data, say in one sentence that you can only answer questions about the animals on this map.`;
+  const common = { instructions, prompt: question, tools, stopWhen: isStepCount(6), maxOutputTokens: 500, temperature: 0.2 };
+
+  let result;
+  if (usesGoogle()) {
+    // Try each Google model in turn: if the first is over its free quota or unavailable, the lighter one usually is not.
+    let lastError: unknown;
+    for (const id of GOOGLE_MODELS) {
+      try { result = await generateText({ model: google(id), ...common }); break; } catch (e) { lastError = e; seen.clear(); used.length = 0; }
+    }
+    if (!result) throw lastError;
+  } else {
+    result = await generateText({ model: ASK_MODEL, providerOptions: { gateway: { models: FALLBACKS } }, ...common });
+  }
 
   return {
     answer: result.text.trim(),
     species: [...seen.entries()].slice(0, 12).map(([scientificName, commonName]) => ({ scientificName, commonName })),
     tools: [...new Set(used)],
-    model: result.response?.modelId ?? ASK_MODEL,
+    model: result.response?.modelId ?? (usesGoogle() ? GOOGLE_MODELS[0] : ASK_MODEL),
     tokens: result.usage?.totalTokens ?? 0,
   };
 }

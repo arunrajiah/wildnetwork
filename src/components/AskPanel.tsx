@@ -66,7 +66,7 @@ export default function AskPanel({ onPick }: { onPick: (scientificName: string) 
 
       <p className="mt-auto text-[11px] leading-relaxed text-slate-500">
         Answers are written by an AI model that may only use this site&apos;s own data, and can still be wrong: check the species panel for the numbers.
-        Your question is sent to the model provider and kept for 30 days to improve answers. <Link href="/methods#ask" className="text-cyan-500 hover:underline">How it works</Link>.
+        Your question is sent to the model provider and kept here for 30 days. Please do not include personal information. <Link href="/methods#ask" className="text-cyan-500 hover:underline">How it works</Link>.
       </p>
     </div>
   );

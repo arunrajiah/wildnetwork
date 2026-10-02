@@ -182,7 +182,7 @@ export default function Methods() {
           <li><b>Four lookups, nothing else.</b> The model can search for a species, read one species&apos; summary and figures, read this week&apos;s changes, and list what is detected near a place. Each lookup reads the same public API as the map. It is instructed to state no number, date or place that a lookup did not return.</li>
           <li><b>Geography is the one exception.</b> It may turn a place name into coordinates and name the region a set of coordinates falls in. That can be wrong, especially near borders.</li>
           <li><b>It can still be wrong.</b> A language model can misread a figure, overstate a pattern or answer a slightly different question. Every answer lists which lookups it used and links the species, so the numbers can be checked on the species panel.</li>
-          <li><b>What is kept.</b> The question, the answer and a scrambled form of the visitor&apos;s address, for 30 days, to limit abuse and to review answer quality. The question is sent to the model provider through the Vercel AI Gateway.</li>
+          <li><b>What is kept.</b> The question, the answer and a scrambled form of the visitor&apos;s address, for 30 days, to limit abuse and to review answer quality. The question is sent to the model provider (Google&apos;s Gemini API on this site). On its free tier, Google may use what is sent to improve its products, so do not put personal information in a question.</li>
           <li><b>Limits.</b> Eight questions an hour per visitor, a daily total, and identical questions are answered from a 6 hour cache.</li>
         </ul>
 

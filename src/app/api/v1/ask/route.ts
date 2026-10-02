@@ -6,7 +6,8 @@ export const maxDuration = 60;
 
 const ENABLED = process.env.ASK_ENABLED === "true";
 const PER_IP_PER_HOUR = 8;
-const PER_DAY_TOTAL = Number(process.env.ASK_DAILY_LIMIT ?? 400);
+// Each question costs the model a few requests, so the default stays well inside a free daily quota.
+const PER_DAY_TOTAL = Number(process.env.ASK_DAILY_LIMIT ?? 150);
 const CACHE_HOURS = 6;
 const MAX_CHARS = 300;
 
@@ -56,6 +57,10 @@ export async function POST(req: Request) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await sql`INSERT INTO ask_log (ip_hash, question, q_norm, error, ms) VALUES (${ipHash}, ${question}, ${qNorm}, ${msg.slice(0, 500)}, ${Date.now() - t0})`;
+    // A free tier that has run out for the day fails here; say so plainly instead of inviting retries.
+    if (/quota|rate.?limit|429|resource.?exhausted/i.test(msg)) {
+      return Response.json({ error: "The question box has used up its free allowance for now. Please try again later." }, { status: 429 });
+    }
     return Response.json({ error: "The question could not be answered just now. Please try again." }, { status: 502 });
   }
 }

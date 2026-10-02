@@ -156,7 +156,7 @@ The public site runs this way, and it fits in free tiers to start.
 5. Deploy the app to Vercel (`vercel --prod`) with `DATABASE_URL` and `CRON_SECRET` set.
 6. Schedule the pull and rollup endpoints (below). Neon scales to zero when idle, so the first request after a quiet period takes about a second.
 
-**Ask box (optional).** Set `ASK_ENABLED=true` to switch on plain language questions, answered by an AI model through the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). On Vercel no key is needed, since the platform supplies a short lived token; the gateway does require a payment card on the account before it serves any request, including free models. `AI_GATEWAY_MODEL` picks the model (default: a free one). The model can only read this site's own data through four lookups, see [methods](https://wildnetwork.arunrajiah.com/methods#ask).
+**Ask box (optional).** Set `ASK_ENABLED=true` to switch on plain language questions, answered by an AI model that can only read this site's own data through four lookups (see [methods](https://wildnetwork.arunrajiah.com/methods#ask)). The free route needs no payment card: create a key in [Google AI Studio](https://aistudio.google.com/apikey), leave billing off, and store it as `GOOGLE_GENERATIVE_AI_API_KEY` in your host's secret store (`vercel env add GOOGLE_GENERATIVE_AI_API_KEY production`), never in a file. Without that key the app uses the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway), which needs no key on Vercel but does need a card on the account.
 
 **Analytics (optional).** Set `NEXT_PUBLIC_GA_ID` to a Google Analytics 4 measurement id. Visitors are asked first, and nothing is loaded from Google unless they allow it. Leave it unset for no analytics at all.
 
