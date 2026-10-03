@@ -51,6 +51,24 @@ export const cellPolygon = (c: { lat: number; lon: number }) =>
 const taxa = new Map<number, { scientific_name: string; vernacular_name: string | null; grp: string }>();
 
 /** Species key -> name and class, cached in memory and in gbif_taxa. */
+/**
+ * English common name: the one most checklists agree on. GBIF's single vernacularName field is often a banding code
+ * or another language, so it is not used.
+ */
+export async function englishName(key: number): Promise<string | null> {
+  const v = await gbifJson<{ results: { vernacularName: string; language?: string }[] }>(`/species/${key}/vernacularNames`, new URLSearchParams({ limit: "200" })).catch(() => null);
+  const votes = new Map<string, { name: string; n: number }>();
+  for (const x of v?.results ?? []) {
+    const name = x.vernacularName?.trim();
+    if (x.language !== "eng" || !name || name.length < 4 || name === name.toUpperCase() || /[.,;()]/.test(name)) continue;
+    const k = name.toLowerCase();
+    const e = votes.get(k) ?? { name, n: 0 };
+    e.n++; votes.set(k, e);
+  }
+  const best = [...votes.values()].sort((x, y) => y.n - x.n || x.name.length - y.name.length)[0];
+  return best ? best.name.replace(/\b\w/g, (c) => c.toUpperCase()) : null;
+}
+
 /** Class from GBIF's taxonomy: bats are the order Chiroptera, the rest are classes. */
 const grpOfTaxon = (t: { classKey?: number; orderKey?: number }) => (t.orderKey === 734 ? "bat" : CLASS_TAXA.find((c) => c.key === t.classKey)?.grp ?? "other");
 
@@ -66,11 +84,7 @@ export async function resolveTaxa(keys: number[]): Promise<void> {
     try {
       const s = await gbifJson<{ canonicalName?: string; scientificName: string; vernacularName?: string; classKey?: number; orderKey?: number }>(`/species/${k}`, new URLSearchParams());
       const grp = grpOfTaxon(s);
-      let vern = s.vernacularName ?? null;
-      if (!vern) {
-        const v = await gbifJson<{ results: { vernacularName: string; language?: string }[] }>(`/species/${k}/vernacularNames`, new URLSearchParams({ limit: "100" })).catch(() => null);
-        vern = v?.results.find((x) => x.language === "eng")?.vernacularName ?? null;
-      }
+      const vern = await englishName(k);
       const row = { scientific_name: s.canonicalName ?? s.scientificName, vernacular_name: vern, grp };
       taxa.set(k, row);
       await sql`INSERT INTO gbif_taxa (species_key, scientific_name, vernacular_name, grp) VALUES (${k}, ${row.scientific_name}, ${row.vernacular_name}, ${grp}) ON CONFLICT (species_key) DO NOTHING`;
