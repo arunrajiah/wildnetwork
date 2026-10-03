@@ -3,7 +3,7 @@
 import { sql } from "../src/lib/db";
 import { englishName } from "../src/lib/gbif";
 
-const taxa = await sql<{ species_key: number }[]>`SELECT species_key FROM gbif_taxa WHERE fetched_at < now() - interval '1 day' OR vernacular_name IS NULL OR vernacular_name = upper(vernacular_name) ORDER BY species_key`;
+const taxa = await sql<{ species_key: number }[]>`SELECT species_key FROM gbif_taxa WHERE fetched_at < now() - interval '1 day' OR vernacular_name IS NULL OR vernacular_name = upper(vernacular_name) ORDER BY (grp = 'avian') DESC, (grp IN ('bat', 'amphibian')) DESC, species_key`;
 console.log(taxa.length, "taxa to check");
 const jobs = [...taxa];
 let done = 0;
