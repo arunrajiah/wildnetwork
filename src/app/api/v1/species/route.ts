@@ -10,7 +10,8 @@ export async function GET(req: Request) {
   const rows = q
     ? await sql`
         SELECT scientific_name, MIN(vernacular_name) AS vernacular_name, SUM(count) AS n, COUNT(DISTINCT (cell_lat, cell_lon)) AS deployments
-        FROM species_daily
+        FROM (SELECT scientific_name, vernacular_name, count, cell_lat, cell_lon FROM species_daily
+              UNION ALL SELECT scientific_name, vernacular_name, count, cell_lat, cell_lon FROM species_weekly WHERE week >= CURRENT_DATE - 60) x
         WHERE scientific_name ILIKE ${"%" + q + "%"} OR vernacular_name ILIKE ${"%" + q + "%"}
         GROUP BY scientific_name
         ORDER BY (MIN(vernacular_name) ILIKE ${q + "%"}) DESC, n DESC

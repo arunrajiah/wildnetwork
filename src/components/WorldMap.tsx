@@ -21,6 +21,8 @@ interface Insights {
   movers: { scientificName: string; vernacularName: string | null; yesterday: number; avg7: number; ratio: number }[];
   drift: { scientificName: string; vernacularName: string | null; region: string; driftDeg: number; latNow: number; n: number }[];
   arrivals: { scientificName: string; vernacularName: string | null; cellLat: number; cellLon: number; n: number }[];
+  seasonal?: { scientificName: string; vernacularName: string | null; cellLat: number; cellLon: number; week: string; n: number }[];
+  common?: { scientificName: string; vernacularName: string | null; n: number; cells: number }[];
 }
 
 interface Movement { scientificName: string; frames: { week: string; total: number; index: number; cells: [number, number, number, number][]; centroids: { region: string; n: number; lat: number; lon: number }[] }[] }
@@ -162,7 +164,7 @@ export default function WorldMap() {
     const rest = [
       fetch(`/api/v1/deployments`).then((r) => r.json() as Promise<FC>).then(setDeployments),
       fetch(`/api/v1/species?hours=${group === "bat" ? 24 : hours}${gq ? "&" + gq : ""}`).then((r) => r.json() as Promise<Species[]>).then((sp) => { setSpeciesList(sp); wantThumbs(sp.slice(0, 15).map((x) => x.scientificName)); }),
-      fetch(`/api/v1/insights${gq ? "?" + gq : ""}`).then((r) => r.json() as Promise<Insights>).then((ins) => { setInsights(ins); wantThumbs([...ins.drift, ...ins.movers, ...ins.arrivals].map((x) => x.scientificName)); }),
+      fetch(`/api/v1/insights${gq ? "?" + gq : ""}`).then((r) => r.json() as Promise<Insights>).then((ins) => { setInsights(ins); wantThumbs([...(ins.seasonal ?? []), ...(ins.common ?? []), ...ins.drift, ...ins.movers, ...ins.arrivals].map((x) => x.scientificName)); }),
       fetch(`/api/v1/status`).then((r) => r.json() as Promise<Status>).then(setStatus),
     ];
     await Promise.allSettled([events, ...rest]);
@@ -423,6 +425,17 @@ export default function WorldMap() {
                   </ul>
                 </section>
               )}
+              <Section title="Latest arrivals" hint="Most recent arrival week, from the weekly history">
+                {insights?.seasonal?.map((a) => (
+                  <Row key={a.scientificName} thumb={thumbs[a.scientificName]} onClick={() => pick(a.scientificName)} name={a.vernacularName ?? a.scientificName} sci={`${a.scientificName} · ${a.cellLat}°, ${a.cellLon}°`}
+                    value={new Date(a.week + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })} tone="neutral" />
+                ))}
+              </Section>
+              <Section title="Most recorded" hint="Latest four weeks with data">
+                {insights?.common?.map((s) => (
+                  <Row key={s.scientificName} thumb={thumbs[s.scientificName]} onClick={() => pick(s.scientificName)} name={s.vernacularName ?? s.scientificName} sci={s.scientificName} value={s.n.toLocaleString()} tone="neutral" />
+                ))}
+              </Section>
               <Section title="Moving" hint="Range centre shift per continent, effort corrected">
                 {insights?.drift.map((d) => (
                   <Row key={d.scientificName + d.region} thumb={thumbs[d.scientificName]} onClick={() => pick(d.scientificName)} name={d.vernacularName ?? d.scientificName} sci={`${d.scientificName} · ${d.region}`}

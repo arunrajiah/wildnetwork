@@ -13,7 +13,19 @@ export async function GET(req: Request) {
   const group = GROUPS.includes(g as Group) ? (g as Group) : null;
   const only = group ? sql`AND g.grp = ${group}` : sql``;
 
-  const [movers, drift, arrivals, meta] = await Promise.all([
+  const [seasonal, common, movers, drift, arrivals, meta] = await Promise.all([
+    // From the weekly history (sources that publish with a delay, such as GBIF): each species' most recent arrival week.
+    sql`
+      SELECT DISTINCT ON (p.scientific_name) p.scientific_name, p.vernacular_name, g.grp, p.cell_lat, p.cell_lon, p.arrival_week::text AS week, p.total_n::int AS n
+      FROM phenology p JOIN species_group g USING (scientific_name)
+      WHERE p.arrival_week >= CURRENT_DATE - 120 AND g.is_species ${only}
+      ORDER BY p.scientific_name, p.arrival_week DESC`,
+    // Most recorded over the latest four weeks that have data.
+    sql`
+      SELECT s.scientific_name, MIN(s.vernacular_name) AS vernacular_name, g.grp, SUM(s.count)::int AS n, COUNT(DISTINCT (s.cell_lat, s.cell_lon))::int AS cells
+      FROM species_weekly s JOIN species_group g USING (scientific_name)
+      WHERE s.week > (SELECT MAX(week) FROM species_weekly WHERE count >= 3) - 28 AND g.is_species ${only}
+      GROUP BY 1, 3 ORDER BY 4 DESC LIMIT 15`,
     // Surging and fading: share of the class's detections yesterday against the mean share of the 7 days before.
     sql`
       WITH e AS (
@@ -105,6 +117,8 @@ export async function GET(req: Request) {
     coverage: { from: meta[0].first_day, to: meta[0].last_day, species: Number(meta[0].species), detections: Number(meta[0].detections ?? 0) },
     // Within one class, "most of the drops are bats" would be trivially true, so that part is skipped.
     summary: overview(driftOut, group ? [] : moversOut),
+    seasonal: [...seasonal].sort((a, b) => (a.week < b.week ? 1 : a.week > b.week ? -1 : b.n - a.n)).slice(0, 12).map((r) => ({ scientificName: r.scientific_name, vernacularName: r.vernacular_name, group: r.grp, cellLat: r.cell_lat, cellLon: r.cell_lon, week: r.week, n: r.n })),
+    common: common.map((r) => ({ scientificName: r.scientific_name, vernacularName: r.vernacular_name, group: r.grp, n: r.n, cells: r.cells })),
     movers: moversOut,
     drift: driftOut,
     arrivals: arrivals.map((r) => ({ scientificName: r.scientific_name, vernacularName: r.vernacular_name, group: r.grp, cellLat: r.cell_lat, cellLon: r.cell_lon, n: r.n })),

@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { sql } from "@/lib/db";
 import { SITE, speciesSlug } from "@/lib/site";
 
-export const revalidate = 86400;
+export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();

@@ -10,7 +10,7 @@ import { REGION } from "@/lib/methods";
 import { SITE, speciesSlug } from "@/lib/site";
 import { getClimate, getYearSpan, speciesStory } from "@/lib/story";
 
-export const revalidate = 86400;
+export const revalidate = 3600;
 
 const CLASS_LABEL: Record<string, string> = { avian: "bird", bat: "bat", amphibian: "frog or toad", insect: "insect", mammal: "mammal", other: "animal" };
 const fmtWeek = (d: string) => new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
@@ -23,7 +23,8 @@ const load = cache(async (slug: string) => {
   const name = sp.scientific_name;
   const [names, recent, arrivals, media, climate, span] = await Promise.all([
     sql<{ vernacular_name: string | null }[]>`SELECT MIN(vernacular_name) AS vernacular_name FROM species_weekly WHERE scientific_name = ${name}`,
-    sql<{ n: number; cells: number }[]>`SELECT COALESCE(SUM(count), 0)::int AS n, COUNT(DISTINCT (cell_lat, cell_lon))::int AS cells FROM species_daily WHERE scientific_name = ${name} AND day >= CURRENT_DATE - 28`,
+    // The weekly history, because some sources publish with a delay of a week or two.
+    sql<{ n: number; cells: number }[]>`SELECT COALESCE(SUM(count), 0)::int AS n, COUNT(DISTINCT (cell_lat, cell_lon))::int AS cells FROM species_weekly WHERE scientific_name = ${name} AND week >= CURRENT_DATE - 56`,
     sql<{ region: string; first: string; last: string; peak: string; areas: number }[]>`
       SELECT ${REGION} AS region, MIN(arrival_week)::text AS first, MAX(arrival_week)::text AS last,
              (percentile_disc(0.5) WITHIN GROUP (ORDER BY peak_week))::text AS peak, COUNT(*)::int AS areas
@@ -95,8 +96,8 @@ export default async function SpeciesPage({ params }: { params: Promise<{ slug: 
         <h2 className="mt-8 text-xl font-semibold text-slate-100">Where it is now</h2>
         <p className="mt-2">
           {d.recent.n > 0
-            ? `In the last 28 days this ${CLASS_LABEL[d.grp] ?? "animal"} was detected ${d.recent.n.toLocaleString("en-GB")} times across ${d.recent.cells} ${d.recent.cells === 1 ? "area" : "areas"} of the sensor network (each area is a 5 degree square).`
-            : "No detections in the last 28 days. It may be out of season where the sensors are."}
+            ? `In the last 8 weeks this ${CLASS_LABEL[d.grp] ?? "animal"} was recorded ${d.recent.n.toLocaleString("en-GB")} times across ${d.recent.cells} ${d.recent.cells === 1 ? "area" : "areas"} (each area is a 5 degree square).`
+            : "No records in the last 8 weeks. It may be out of season where the observers and sensors are."}
         </p>
         <p className="mt-3">
           <Link href={`/?species=${encodeURIComponent(d.name)}`} className="inline-block rounded-md bg-cyan-500 px-4 py-2 font-medium text-slate-950 hover:bg-cyan-400">See the {title} on the live map</Link>

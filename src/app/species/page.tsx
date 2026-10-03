@@ -5,7 +5,7 @@ import { BIRDWEATHER_PAUSED } from "@/lib/sources";
 import { sql } from "@/lib/db";
 import { speciesSlug } from "@/lib/site";
 
-export const revalidate = 86400;
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Species: migration and arrival dates",
