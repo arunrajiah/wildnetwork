@@ -102,6 +102,13 @@ export async function rollupGbifCellWeek(cell: { lat: number; lon: number }, wee
     return t ? [{ week, source_system: "gbif", scientific_name: t.scientific_name, vernacular_name: t.vernacular_name, cell_lat: cell.lat, cell_lon: cell.lon, count: x.count, high_conf_count: x.count, grp: t.grp }] : [];
   });
   if (!rows.length) return 0;
+  // Two GBIF keys can share one canonical name (synonyms, subspecies): merge them so a row is written once.
+  const merged = new Map<string, (typeof rows)[number]>();
+  for (const r of rows) {
+    const m = merged.get(r.scientific_name);
+    if (m) { m.count += r.count; m.high_conf_count += r.high_conf_count; m.vernacular_name ??= r.vernacular_name; } else merged.set(r.scientific_name, { ...r });
+  }
+  rows.length = 0; rows.push(...merged.values());
   await upsertGroups(rows.map((r) => ({ name: r.scientific_name, grp: r.grp })));
   const out = rows.map((r) => ({ week: r.week, source_system: r.source_system, scientific_name: r.scientific_name, vernacular_name: r.vernacular_name, cell_lat: r.cell_lat, cell_lon: r.cell_lon, count: r.count, high_conf_count: r.high_conf_count }));
   await sql`
