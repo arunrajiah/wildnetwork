@@ -18,8 +18,13 @@ let done = 0, rows = 0, errors = 0;
 const t0 = Date.now();
 await Promise.all(Array.from({ length: conc }, async () => {
   while (jobs.length) {
-    const j = jobs.shift()!;
-    try { rows += await rollupGbifCellWeek(j.cell, j.week); } catch (e) { errors++; if (errors < 5) console.error(j, String(e)); }
+    const j = jobs.shift()! as (typeof jobs)[number] & { tries?: number };
+    try { rows += await rollupGbifCellWeek(j.cell, j.week); } catch (e) {
+      // Network drops (laptop sleep) and deadlocks are transient: wait, then put the job back, up to 8 times.
+      j.tries = (j.tries ?? 0) + 1;
+      if (j.tries <= 8) { await new Promise((r) => setTimeout(r, 30_000)); jobs.push(j); done--; }
+      else { errors++; if (errors < 5) console.error(j, String(e)); }
+    }
     if (++done % 200 === 0) console.log(`${done} done, ${rows} rows, ${errors} errors, ${Math.round((Date.now() - t0) / 1000)}s`);
   }
 }));
