@@ -17,8 +17,10 @@ let done = 0;
 await Promise.all(Array.from({ length: 3 }, async () => {
   while (jobs.length) {
     const t = jobs.shift()!;
-    const name = await englishName(t.species_key);
-    await sql`UPDATE gbif_taxa SET vernacular_name = ${name}, fetched_at = now() + interval '1 second' WHERE species_key = ${t.species_key}`;
+    try {
+      const name = await englishName(t.species_key);
+      await sql`UPDATE gbif_taxa SET vernacular_name = ${name}, fetched_at = now() + interval '1 second' WHERE species_key = ${t.species_key}`;
+    } catch { await new Promise((r) => setTimeout(r, 30_000)); jobs.push(t); continue; } // network drop: wait and retry
     if (++done % 500 === 0) console.log(done, "done");
     if (done % 2000 === 0) await copyNames();
   }
