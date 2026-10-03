@@ -57,7 +57,10 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
       FROM sp JOIN ef USING (cell_lat, cell_lon)
       ORDER BY sp.n DESC LIMIT 200
     `,
-    sql`SELECT MIN(vernacular_name) vernacular_name, array_agg(DISTINCT source_system) sources FROM species_daily WHERE scientific_name = ${name}`,
+    // Name and sources from the weekly history as well: some sources (GBIF) only reach the daily tables in part.
+    sql`SELECT MIN(vernacular_name) vernacular_name, array_agg(DISTINCT source_system) sources FROM (
+          SELECT vernacular_name, source_system FROM species_daily WHERE scientific_name = ${name}
+          UNION ALL SELECT vernacular_name, source_system FROM species_weekly WHERE scientific_name = ${name} AND week >= CURRENT_DATE - 371) x`,
   ]);
 
   // Weather at each day's centroid. Group days by 1-degree cell so repeated centroids share one request.
