@@ -1,7 +1,7 @@
 import { sql } from "@/lib/db";
 
 /** Version of the published methods. Bump when a measure changes, and add a line to the changelog on /methods. */
-export const METHODS_VERSION = "0.7";
+export const METHODS_VERSION = "0.8";
 
 /** A cell-day needs this many detections of all species before it counts as observed. */
 export const MIN_EFFORT_DAY = 200;

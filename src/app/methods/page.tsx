@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import PausedNotice from "@/components/PausedNotice";
+import { BIRDWEATHER_PAUSED } from "@/lib/sources";
 import { METHODS_VERSION, MIN_CELL_DETECTIONS, MIN_EFFORT_DAY, MIN_EFFORT_WEEK, SMALL_CLASS } from "@/lib/methods";
 
 export const metadata: Metadata = {
@@ -19,7 +20,7 @@ export default function Methods() {
         <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-100">Methods</h1>
         <p className="mt-1 text-sm text-slate-500">Version {METHODS_VERSION} · updated 2 October 2026</p>
 
-        <PausedNotice className="mt-6" />
+        {BIRDWEATHER_PAUSED && <PausedNotice className="mt-6" />}
 
         <p className="mt-6">
           This page states exactly how each number on WildNetwork is produced, and where it can mislead. If you plan to use these measures in research,
@@ -32,7 +33,7 @@ export default function Methods() {
           A <b>detection</b> is one record that a species was identified at a place and time, by a classifier or a person. WildNetwork currently holds three kinds:
         </p>
         <ul className="mt-2 list-disc pl-5 space-y-1">
-          <li><b>Acoustic detections</b> from BirdWeather community stations: birds, frogs, insects and some mammals identified by BirdNET, and bats identified by BirdWeather&apos;s ultrasonic classifier. This was the large majority of the data and is paused at BirdWeather&apos;s request.</li>
+          <li><b>Acoustic detections</b> from BirdWeather community stations: birds, frogs, insects and some mammals identified by BirdNET, and bats identified by BirdWeather&apos;s ultrasonic classifier. This is the large majority of the data. Detections only: soundscapes and recording links are never taken, at BirdWeather&apos;s request. Paused from 2 to 6 October 2026 while terms were discussed.</li>
           <li><b>Published observations</b> through <a href="https://www.gbif.org" className="text-cyan-400 hover:underline">GBIF</a>, limited to records their publishers released under CC0 or CC BY 4.0 (mostly national recording schemes such as Artportalen, the Norwegian Species Observation Service and Arter.dk). Live records are those GBIF indexed in the last days; the weekly history is counted straight from GBIF per cell and week, and includes iNaturalist&apos;s licensed records. Each dataset is cited by DOI in the credits.</li>
           <li><b>Community observations</b> from iNaturalist, limited to CC0 and CC BY records.</li>
           <li><b>Device detections</b> pushed by contributors running wdx-agent on BirdNET-Pi, BirdNET-Go or camera traps.</li>
@@ -248,6 +249,7 @@ export default function Methods() {
 
         <H2 id="changes">7. Changes</H2>
         <ul className="mt-2 list-disc pl-5 space-y-1">
+          <li><b>0.8</b> (6 October 2026): BirdWeather resumed, detections only (no soundscape links), after BirdWeather confirmed that detections are fine. Its held history was restored, so measures cover both sources again.</li>
           <li><b>0.7</b> (3 October 2026): BirdWeather paused at their request. GBIF added as a source (CC0 and CC BY records only); weekly history for GBIF and iNaturalist now comes from GBIF&apos;s own counts per cell and week rather than from the live window. Thresholds unchanged, so with far fewer detections most cells are &quot;not watched&quot;. Two lists were added to the map panel: &quot;Latest arrivals&quot; (each species&apos; most recent arrival week in the last 120 days, from the arrival dates above) and &quot;Most recorded&quot; (raw record counts over the latest four weeks with data, not effort corrected). GBIF publishes with a delay of one to two weeks, so the day-by-day measures are mostly empty for now.</li>
           <li><b>0.6</b> (2 October 2026): Ask, a question box answered by a language model restricted to four lookups over the site&apos;s own data.</li>
           <li><b>0.5</b> (2 October 2026): text summaries written by fixed rules, including the temperature at which a species is first heard and its yearly span.</li>
