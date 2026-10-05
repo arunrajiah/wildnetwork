@@ -13,7 +13,6 @@ query Pull($from: ISO8601Date!, $to: ISO8601Date!, $after: String, $first: Int!,
     nodes {
       id timestamp confidence probability
       coords { lat lon }
-      soundscape { url }
       species { id commonName scientificName ebirdCode classification }
       station { id name type locationPrivacy locationPrivacyRadius coords { lat lon } }
     }
@@ -26,7 +25,6 @@ interface Node {
   confidence: number;
   probability: number | null;
   coords: { lat: number; lon: number } | null;
-  soundscape: { url: string } | null;
   species: { id: string; commonName: string; scientificName: string; ebirdCode: string | null; classification: string | null };
   station: {
     id: string;
@@ -62,7 +60,7 @@ function toWdx(n: Node): WdxEvent | null {
       taxonRank: n.species.scientificName.includes(" ") ? "species" : "unranked",
       classifier: { name: n.species.classification === "bat" ? "BirdWeather bat classifier" : "BirdNET", version: "unknown" },
     },
-    media: n.soundscape?.url ? { mediaType: "audio", url: n.soundscape.url } : undefined,
+    // Detections only: BirdWeather asked (Tim, 5 October 2026) that soundscapes and recording links are never taken.
     review: { status: "unreviewed" },
     source: { system: "birdweather", sourceRecordId: n.id },
   };
