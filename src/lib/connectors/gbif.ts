@@ -90,6 +90,8 @@ export const gbif: PullConnector = {
       p.set("limit", String(PAGE));
       p.set("offset", String(o));
       if (Date.now() - t0 > BUDGET_MS) break;
+      // Deep offsets time out on GBIF's side; a day with more than 3,000 newly indexed records is cut off there (the weekly rollup still counts them).
+      if (o >= 3000) { if (d < today) { d = new Date(Date.parse(d) + 86400_000).toISOString().slice(0, 10); o = 0; continue; } break; }
       const j = await gbifJson<{ results: Occ[]; endOfRecords: boolean }>("/occurrence/search", p, 1);
       for (const occ of j.results) {
         const ev = toWdx(occ);
