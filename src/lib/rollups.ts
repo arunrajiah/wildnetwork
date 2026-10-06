@@ -167,6 +167,8 @@ export async function refreshDerived(days = 7): Promise<void> {
     WHERE s.week >= date_trunc('week', CURRENT_DATE)::date - ${days}::int GROUP BY 1, 2, 3, 4
     ON CONFLICT (week, cell_lat, cell_lon, grp) DO UPDATE SET detections = EXCLUDED.detections, species = EXCLUDED.species
   `;
+  await refreshSourceEffort(`${days}`);
+
 }
 
 /** Remember each species' class. A name without a space is a genus, family or order, not a species. */
@@ -206,4 +208,16 @@ export async function classifyAll(): Promise<Record<string, number>> {
   await sql`TRUNCATE effort_daily, effort_weekly`;
   await refreshDerived(4000);
   return out;
+}
+
+/** Per-source weekly effort for the comparison and the coverage map. `days` limits it to recent weeks; "all" rebuilds the year. */
+export async function refreshSourceEffort(days: string | "all" = "14"): Promise<void> {
+  const since = days === "all" ? sql`` : sql`AND s.week >= date_trunc('week', CURRENT_DATE)::date - ${Number(days)}::int`;
+  await sql`
+    INSERT INTO effort_weekly_source (week, cell_lat, cell_lon, grp, source_system, detections, species)
+    SELECT s.week, s.cell_lat, s.cell_lon, ${GRP()}, s.source_system, SUM(s.count), COUNT(DISTINCT s.scientific_name)
+    FROM species_weekly s LEFT JOIN species_group g USING (scientific_name)
+    WHERE true ${since}
+    GROUP BY 1, 2, 3, 4, 5
+    ON CONFLICT (week, cell_lat, cell_lon, grp, source_system) DO UPDATE SET detections = EXCLUDED.detections, species = EXCLUDED.species`;
 }

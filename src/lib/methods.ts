@@ -1,7 +1,7 @@
 import { sql } from "@/lib/db";
 
 /** Version of the published methods. Bump when a measure changes, and add a line to the changelog on /methods. */
-export const METHODS_VERSION = "0.8";
+export const METHODS_VERSION = "0.9";
 
 /** A cell-day needs this many detections of all species before it counts as observed. */
 export const MIN_EFFORT_DAY = 200;
@@ -34,3 +34,11 @@ export const minEffortDay = (e = sql`e`) => sql`(CASE WHEN ${e}.grp = 'avian' TH
 export const minEffortWeek = (e = sql`e`) => sql`(CASE WHEN ${e}.grp = 'avian' THEN ${MIN_EFFORT_WEEK}::int ELSE ${SMALL_CLASS.MIN_EFFORT_WEEK}::int END)`;
 /** Scales a count threshold down for the small classes. */
 export const scaled = (n: number, grp = sql`grp`) => sql`(CASE WHEN ${grp} = 'avian' THEN ${n}::int ELSE ${Math.ceil(n * SMALL_CLASS.SCALE)}::int END)`;
+
+/**
+ * Human records (GBIF) come in far smaller numbers than acoustic detections, so a cell-week counts as watched by
+ * observers at a lower total. Used only where the two sources are compared or published separately.
+ */
+export const OBSERVED = { MIN_EFFORT_WEEK: 100, SMALL_MIN_EFFORT_WEEK: 20 };
+export const minObservedWeek = (grp: string) => (grp === "avian" ? OBSERVED.MIN_EFFORT_WEEK : OBSERVED.SMALL_MIN_EFFORT_WEEK);
+export const minAcousticWeek = (grp: string) => (grp === "avian" ? MIN_EFFORT_WEEK : SMALL_CLASS.MIN_EFFORT_WEEK);

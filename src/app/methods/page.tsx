@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PausedNotice from "@/components/PausedNotice";
 import { BIRDWEATHER_PAUSED } from "@/lib/sources";
-import { METHODS_VERSION, MIN_CELL_DETECTIONS, MIN_EFFORT_DAY, MIN_EFFORT_WEEK, SMALL_CLASS } from "@/lib/methods";
+import { METHODS_VERSION, MIN_CELL_DETECTIONS, MIN_EFFORT_DAY, MIN_EFFORT_WEEK, OBSERVED, SMALL_CLASS } from "@/lib/methods";
 
 export const metadata: Metadata = {
   title: "Methods: how wildlife movement is measured",
@@ -194,6 +194,29 @@ export default function Methods() {
 
         <Src files={[["src/app/api/v1/insights/route.ts", "insights"], ["src/app/api/v1/species/%5Bname%5D/route.ts", "species"], ["src/app/api/v1/species/%5Bname%5D/movement/route.ts", "movement"]]} />
 
+        <H3><span id="two-sources" className="scroll-mt-6">Heard versus seen</span></H3>
+        <p>
+          For one species, the panel compares acoustic detections (BirdWeather) with human records (GBIF) over the <b>same cells and weeks</b>: a cell-week is used
+          only when recordings reach the usual weekly minimum ({MIN_EFFORT_WEEK.toLocaleString("en-GB")} bird detections) and sightings reach{" "}
+          {OBSERVED.MIN_EFFORT_WEEK} bird records ({OBSERVED.SMALL_MIN_EFFORT_WEEK} and {SMALL_CLASS.MIN_EFFORT_WEEK} for other classes). Each line is the species&apos; share of its own
+          source&apos;s records, per 1,000, in the continent where both sources record it most, and each is scaled to its own peak, because the two sources count very
+          different things. Only the shape is compared.
+        </p>
+        <ul className="mt-2 list-disc pl-5 space-y-1">
+          <li><b>Agreement</b> is the correlation of the two weekly series: 0.7 or more reads &quot;rise and fall together&quot;, 0.4 to 0.7 &quot;broadly agree&quot;, below 0.4 &quot;tell different stories&quot;.</li>
+          <li><b>Lead or lag</b>: the series are shifted by up to four weeks either way; a shift is reported only if it raises the correlation by at least 0.05 and to at least 0.5.</li>
+          <li><b>Arrival</b> in each source uses the same rule as the arrival dates, applied to that source alone.</li>
+          <li>Needs at least 8 shared weeks. Shown on the site only: BirdWeather data is not redistributed.</li>
+        </ul>
+
+        <H3><span id="coverage" className="scroll-mt-6">Coverage</span></H3>
+        <p>
+          The coverage layer on the map marks each 5 degree cell by who watches it well enough to use, averaged over four weeks ending two weeks ago (human records reach
+          GBIF a week or two late): <b>recordings</b> at {MIN_EFFORT_WEEK.toLocaleString("en-GB")} or more bird detections a week, <b>sightings</b> at{" "}
+          {OBSERVED.MIN_EFFORT_WEEK} or more bird records a week, both, or too thin to use. Check it before drawing conclusions about a region. Available as{" "}
+          <code className="text-slate-200">/api/v1/coverage</code>.
+        </p>
+
         <H2 id="check">4. A worked check</H2>
         <p>
           Wilson&apos;s Warbler (<i>Cardellina pusilla</i>) breeds across boreal Canada and Alaska and winters from Mexico to Panama. Its weekly range centre in
@@ -228,7 +251,7 @@ export default function Methods() {
           <li><b>No uncertainty yet.</b> Measures are reported without confidence intervals.</li>
           <li><b>Short history.</b> Daily rollups cover four weeks; weekly rollups go back up to a year but with fewer stations in earlier months.</li>
           <li><b>Weather is a single point.</b> Conditions at the range centre do not describe what a migrating bird experienced along its way, and a correlation over a few weeks is not evidence of cause.</li>
-          <li><b>Mixed sources.</b> Acoustic detections and human observations are counted together in effort. Human observations are a very small fraction today.</li>
+          <li><b>Mixed sources.</b> Acoustic detections and human observations are counted together in the main measures, where recordings dominate (about 3 billion bird detections a year against 8 million records). They are kept apart only in heard versus seen, coverage and the open data release.</li>
         </ol>
 
         <H2 id="use">6. Using and citing</H2>
@@ -247,8 +270,14 @@ export default function Methods() {
           <a href="https://github.com/arunrajiah/wildnetwork/issues/new?template=misleading_insight.md" className="text-cyan-400 hover:underline">open a &quot;misleading insight&quot; issue</a>.
         </p>
 
+        <p className="mt-3">
+          <b>Open data.</b> Weekly records, observation effort and arrival dates built from openly licensed GBIF records are published as versioned, citable files:
+          see <Link href="/data" className="text-cyan-400 hover:underline">Open data</Link>. BirdWeather-derived figures are not part of the releases.
+        </p>
+
         <H2 id="changes">7. Changes</H2>
         <ul className="mt-2 list-disc pl-5 space-y-1">
+          <li><b>0.9</b> (6 October 2026): heard versus seen (recordings against human records in the same cells and weeks), a coverage layer, per-source effort, and the first open data release.</li>
           <li><b>0.8</b> (6 October 2026): BirdWeather resumed, detections only (no soundscape links), after BirdWeather confirmed that detections are fine. Its held history was restored, so measures cover both sources again.</li>
           <li><b>0.7</b> (3 October 2026): BirdWeather paused at their request. GBIF added as a source (CC0 and CC BY records only); weekly history for GBIF and iNaturalist now comes from GBIF&apos;s own counts per cell and week rather than from the live window. Thresholds unchanged, so with far fewer detections most cells are &quot;not watched&quot;. Two lists were added to the map panel: &quot;Latest arrivals&quot; (each species&apos; most recent arrival week in the last 120 days, from the arrival dates above) and &quot;Most recorded&quot; (raw record counts over the latest four weeks with data, not effort corrected). GBIF publishes with a delay of one to two weeks, so the day-by-day measures are mostly empty for now.</li>
           <li><b>0.6</b> (2 October 2026): Ask, a question box answered by a language model restricted to four lookups over the site&apos;s own data.</li>

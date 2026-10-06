@@ -69,6 +69,8 @@ export default function WorldMap() {
     return () => { cancelled = true; clearTimeout(t); };
   }, [query]);
   const [status, setStatus] = useState<Status | null>(null);
+  const [coverage, setCoverage] = useState<{ summary: Record<string, number>; cells: { lat: number; lon: number; status: string; acoustic: number; observed: number }[] } | null>(null);
+  const [showCoverage, setShowCoverage] = useState(false);
   const [movement, setMovement] = useState<Movement | null>(null);
   const [frame, setFrame] = useState<number | null>(null); // index into movement.frames; null = live view
   const [mvPlaying, setMvPlaying] = useState(false);
@@ -101,6 +103,16 @@ export default function WorldMap() {
       });
       map.addLayer({ id: "track-line", type: "line", source: "track", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#f8fafc", "line-width": 3, "line-opacity": 0.75 } });
       map.addLayer({ id: "track-head", type: "circle", source: "track", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 6, "circle-color": "#f8fafc", "circle-stroke-width": 2, "circle-stroke-color": "#020617" } });
+      // Coverage: which cells recordings, sightings or both watch well enough to use (see /methods#coverage).
+      map.addSource("coverage", { type: "geojson", data: EMPTY });
+      map.addLayer({
+        id: "coverage", type: "fill", source: "coverage",
+        paint: {
+          "fill-color": ["match", ["get", "status"], "both", "#a78bfa", "acoustic", "#22d3ee", "observed", "#f59e0b", "#64748b"],
+          "fill-opacity": ["match", ["get", "status"], "thin", 0.12, 0.35],
+          "fill-outline-color": "rgba(255,255,255,0.15)",
+        },
+      });
       map.addLayer({ id: "deployments", type: "circle", source: "deployments", paint: { "circle-radius": 2, "circle-color": "#475569", "circle-opacity": 0.7 } });
       map.addLayer({
         id: "events-glow", type: "circle", source: "events",
@@ -230,6 +242,22 @@ export default function WorldMap() {
 
   const frames = useMemo(() => (species && movement?.scientificName === species ? movement.frames : []), [species, movement]);
   const activeFrame = species && frame !== null && frames[frame] ? frames[frame] : null;
+
+  // Coverage layer: fetched once when first shown, hidden while a species is selected.
+  useEffect(() => {
+    if (!showCoverage || coverage) return;
+    fetch(`/api/v1/coverage`).then((r) => r.json()).then(setCoverage).catch(() => {});
+  }, [showCoverage, coverage]);
+  useEffect(() => {
+    const map = mapRef.current;
+    const src = map?.getSource("coverage") as GeoJSONSource | undefined;
+    if (!map || !src) return;
+    const on = showCoverage && !species && coverage;
+    src.setData(on ? { type: "FeatureCollection", features: coverage.cells.map((c) => ({
+      type: "Feature", properties: { status: c.status },
+      geometry: { type: "Polygon", coordinates: [[[c.lon, c.lat], [c.lon + 5, c.lat], [c.lon + 5, c.lat + 5], [c.lon, c.lat + 5], [c.lon, c.lat]]] },
+    })) } : EMPTY);
+  }, [showCoverage, species, coverage, ready]);
   const shareScale = useMemo(() => {
     const all = frames.flatMap((f) => f.cells.map((c) => c[3])).sort((a, b) => a - b);
     return all.length ? Math.max(all[Math.floor(all.length * 0.95)], 1e-6) : 1;
@@ -499,9 +527,26 @@ export default function WorldMap() {
           </>
         ) : (
           <>
-            <div className="text-slate-400 mb-1">{group === "bat" ? "Bat detections, last 24h" : `Detections, last ${hours}h (sample)`}</div>
+            <div className="text-slate-400 mb-1" title="The newest detections from each source, refreshed every few minutes. Measures use full counts, not these dots.">{group === "bat" ? "Bat detections, last 24h" : `Detections, last ${hours}h (sample)`}</div>
             <div className="flex flex-wrap gap-x-3 gap-y-0.5"><Legend color="#0891b2" label="BirdWeather" /><Legend color="#f59e0b" label="GBIF" /><Legend color="#65a30d" label="iNaturalist" /><Legend color="#db2777" label="Devices" /><Legend color="#475569" label="Sensor" /></div>
           </>
+        )}
+        {!species && (
+          <div className="mt-1.5 pt-1.5 border-t border-white/10">
+            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+              <input type="checkbox" checked={showCoverage} onChange={(e) => { setShowCoverage(e.target.checked); if (e.target.checked) track("show_coverage"); }} className="accent-[#a78bfa]" />
+              <span>Coverage</span>
+            </label>
+            {showCoverage && (
+              <div className="mt-1 space-y-0.5">
+                <Legend color="#a78bfa" label={`Recordings and sightings${coverage ? ` (${coverage.summary.both})` : ""}`} />
+                <Legend color="#22d3ee" label={`Recordings only${coverage ? ` (${coverage.summary.acoustic})` : ""}`} />
+                <Legend color="#f59e0b" label={`Sightings only${coverage ? ` (${coverage.summary.observed})` : ""}`} />
+                <Legend color="#64748b" label="Too thin to use" />
+                <Link href="/methods#coverage" className="block text-cyan-500 hover:underline">What counts as watched</Link>
+              </div>
+            )}
+          </div>
         )}
       </div>
 

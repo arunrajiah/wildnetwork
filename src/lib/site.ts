@@ -5,3 +5,6 @@ export const SITE_DESCRIPTION =
 
 /** "Hirundo rustica" -> "hirundo-rustica" */
 export const speciesSlug = (scientificName: string) => scientificName.toLowerCase().replace(/\s+/g, "-");
+
+/** Open data releases (GBIF-derived only), newest first. Built by scripts/release.mts and attached to a GitHub release. */
+export const DATA_RELEASES: { date: string; url: string; zip: string; weeks: string; rows: { weekly: number; effort: number; arrivals: number; datasets: number }; doi?: string }[] = [];

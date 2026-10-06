@@ -119,6 +119,7 @@ export default function SpeciesPanel({ name, onClose }: { name: string; onClose:
       <Line title="Max temperature at range centre (°C)" values={days.map((d) => d.weather?.tmax ?? null)} labels={labels} format={(v) => `${v.toFixed(0)}°`} color="#fb923c" />
       <Line title="Max wind at range centre (km/h)" values={days.map((d) => d.weather?.wind ?? null)} labels={labels} format={(v) => `${v.toFixed(0)}`} color="#94a3b8" />
       <ArrivalTable rows={arrivals?.name === name ? arrivals.rows : null} name={name} />
+      <HeardVsSeen name={name} />
       <p className="text-[11px] text-slate-500 pb-4">
         Effort corrected: figures are the species&apos; share of all {CLASS_NOUN[data.group ?? "avian"] || "bird"} detections, so more stations do not look like more animals.{" "}
         <Link href="/methods" className="text-cyan-500 hover:underline">How this is measured, and its limits</Link>.{" "}
@@ -182,4 +183,66 @@ function pearson(a: number[], b: (number | null)[]): number | null {
   let sxy = 0, sxx = 0, syy = 0;
   for (const [x, y] of pairs) { sxy += (x - mx) * (y - my); sxx += (x - mx) ** 2; syy += (y - my) ** 2; }
   return sxx && syy ? sxy / Math.sqrt(sxx * syy) : null;
+}
+
+interface TwoSources {
+  scientificName: string; region: string | null; medianCells?: number; r: number | null; lag: number | null;
+  weeks: { week: string; acoustic: { index: number }; observed: { index: number } }[];
+  arrival: { acoustic: string | null; observed: string | null };
+}
+
+const fmtWeek = (w: string) => new Date(w + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+
+/** Sentences for the comparison, from fixed templates (documented at /methods#two-sources). */
+function twoSourceWords(d: TwoSources): string[] {
+  const out: string[] = [];
+  if (d.r != null) {
+    const how = d.r >= 0.7 ? "rise and fall together" : d.r >= 0.4 ? "broadly agree" : "tell different stories";
+    out.push(`In ${d.region}, over ${d.weeks.length} weeks in about ${d.medianCells} areas watched by both, recordings and human sightings ${how} (correlation ${d.r.toFixed(2)}).`);
+  }
+  if (d.lag) out.push(d.lag > 0 ? `Sightings trail recordings by about ${d.lag} week${d.lag > 1 ? "s" : ""}.` : `Recordings trail sightings by about ${-d.lag} week${d.lag < -1 ? "s" : ""}.`);
+  const { acoustic: a, observed: o } = d.arrival;
+  if (a && o) {
+    const gap = Math.round((Date.parse(o) - Date.parse(a)) / (7 * 86400_000));
+    out.push(gap === 0 ? `Both put its arrival in the week of ${fmtWeek(a)}.` : `Recordings put its arrival in the week of ${fmtWeek(a)}, sightings ${Math.abs(gap)} week${Math.abs(gap) > 1 ? "s" : ""} ${gap > 0 ? "later" : "earlier"}.`);
+  } else if (a) out.push(`Only the recordings show a clear arrival, in the week of ${fmtWeek(a)}.`);
+  else if (o) out.push(`Only the sightings show a clear arrival, in the week of ${fmtWeek(o)}.`);
+  if (d.r != null && d.r < 0.4) out.push("Disagreement is common for residents and for species whose song changes through the year; it does not by itself mean either source is wrong.");
+  return out;
+}
+
+/** Heard versus seen: acoustic detections against human records in the same cells and weeks. */
+function HeardVsSeen({ name }: { name: string }) {
+  const [d, setD] = useState<TwoSources | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/v1/species/${encodeURIComponent(name)}/sources`).then((r) => r.json()).then((j) => { if (!cancelled) setD(j); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [name]);
+  if (!d || d.scientificName !== name || d.weeks.length < 8) return null;
+  // Each series scaled to its own peak: the two sources count very different things, so only the shape is compared.
+  const norm = (v: number[]) => { const m = Math.max(...v); return v.map((x) => (m ? x / m : 0)); };
+  const a = norm(d.weeks.map((w) => w.acoustic.index)), o = norm(d.weeks.map((w) => w.observed.index));
+  const x = (i: number) => PAD.l + (i / (d.weeks.length - 1)) * (W - PAD.l - PAD.r);
+  const y = (v: number) => PAD.t + (1 - v) * (H - PAD.t - PAD.b);
+  const path = (v: number[]) => v.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p).toFixed(1)}`).join("");
+  return (
+    <section aria-label="Heard versus seen" className="rounded-md border border-white/10 bg-white/5 px-3 py-2.5">
+      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Heard versus seen</h3>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Weekly share in recordings and in human sightings, each scaled to its own peak">
+        <path d={path(a)} fill="none" stroke="#22d3ee" strokeWidth={2} />
+        <path d={path(o)} fill="none" stroke="#f59e0b" strokeWidth={2} />
+        <text x={PAD.l} y={H - 4} fontSize={10} fill="#64748b">{fmtWeek(d.weeks[0].week)}</text>
+        <text x={W - PAD.r} y={H - 4} fontSize={10} fill="#64748b" textAnchor="end">{fmtWeek(d.weeks[d.weeks.length - 1].week)}</text>
+      </svg>
+      <div className="flex gap-3 text-[11px] text-slate-400 mb-1">
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-[#22d3ee]" />Recordings (BirdWeather)</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-[#f59e0b]" />Sightings (GBIF)</span>
+      </div>
+      <ul className="space-y-1.5 text-[13px] leading-relaxed text-slate-200">
+        {twoSourceWords(d).map((line) => <li key={line}>{line}</li>)}
+      </ul>
+      <p className="mt-1.5 text-[11px] text-slate-500">Same cells and weeks only; each line is the species&apos; share of its own source, scaled to its peak. <Link href="/methods#two-sources" className="text-cyan-500 hover:underline">How</Link>.</p>
+    </section>
+  );
 }

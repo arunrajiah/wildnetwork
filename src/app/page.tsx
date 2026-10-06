@@ -29,6 +29,8 @@ export default function Home() {
           <Link href="/methods">Methods</Link>
           <Link href="/validation">Validation</Link>
           <Link href="/contribute">Contribute data</Link>
+          <Link href="/data">Open data</Link>
+          <Link href="/stations">Stations</Link>
         </nav>
       </div>
       <WorldMap />

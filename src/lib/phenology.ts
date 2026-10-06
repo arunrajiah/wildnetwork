@@ -1,5 +1,5 @@
 import { sql } from "@/lib/db";
-import { METHODS_VERSION, SMALL_CLASS, minEffortWeek } from "@/lib/methods";
+import { METHODS_VERSION, MIN_EFFORT_WEEK, OBSERVED, SMALL_CLASS, minEffortWeek } from "@/lib/methods";
 
 export interface WeekPoint { week: string; value: number; n: number }
 export interface Season { arrival: string; departure: string | null; peak: string; peakValue: number; total: number; weeks: number; absentWeeks: number }
@@ -60,12 +60,24 @@ export function detectSeason(series: WeekPoint[], limits = PHENOLOGY): Season | 
   return { arrival: series[best.i].week, departure, peak: series[seasonPeak].week, peakValue: series[seasonPeak].value, total, weeks: series.length, absentWeeks: best.run };
 }
 
-/** Recompute the phenology table from species_weekly and effort_weekly. Streams rows, so memory stays small. */
-export async function recomputePhenology(): Promise<{ pairs: number; seasons: number }> {
+/**
+ * Seasonal timing per species and cell. Without `source`, all sources together against effort_weekly (the site's arrival dates).
+ * With `source`, one source alone against its own effort (used for the open data release and the two-source comparison).
+ * Streams rows, so memory stays small.
+ */
+export async function computeSeasons(source?: string): Promise<{ pairs: number; rows: Record<string, unknown>[] }> {
   const effort = new Map<string, Map<string, number>>(); // class|cell -> week -> detections
-  for (const e of await sql<{ week: string; cell_lat: number; cell_lon: number; grp: string; detections: number }[]>`
-    SELECT e.week::text, e.cell_lat, e.cell_lon, e.grp, e.detections FROM effort_weekly e
-    WHERE e.detections >= ${minEffortWeek()} AND e.week <= CURRENT_DATE - 7 ORDER BY e.week`) {
+  const effortRows = source
+    ? sql<{ week: string; cell_lat: number; cell_lon: number; grp: string; detections: number }[]>`
+        SELECT e.week::text, e.cell_lat, e.cell_lon, e.grp, e.detections FROM effort_weekly_source e
+        WHERE e.source_system = ${source} AND e.week <= CURRENT_DATE - 7
+          AND e.detections >= (CASE WHEN e.grp = 'avian' THEN ${source === "birdweather" ? MIN_EFFORT_WEEK : OBSERVED.MIN_EFFORT_WEEK}::int
+                                    ELSE ${source === "birdweather" ? SMALL_CLASS.MIN_EFFORT_WEEK : OBSERVED.SMALL_MIN_EFFORT_WEEK}::int END)
+        ORDER BY e.week`
+    : sql<{ week: string; cell_lat: number; cell_lon: number; grp: string; detections: number }[]>`
+        SELECT e.week::text, e.cell_lat, e.cell_lon, e.grp, e.detections FROM effort_weekly e
+        WHERE e.detections >= ${minEffortWeek()} AND e.week <= CURRENT_DATE - 7 ORDER BY e.week`;
+  for (const e of await effortRows) {
     const k = `${e.grp}|${e.cell_lat},${e.cell_lon}`;
     if (!effort.has(k)) effort.set(k, new Map());
     effort.get(k)!.set(e.week, e.detections);
@@ -91,7 +103,7 @@ export async function recomputePhenology(): Promise<{ pairs: number; seasons: nu
   await sql<{ scientific_name: string; vernacular_name: string | null; grp: string; cell_lat: number; cell_lon: number; week: string; n: number }[]>`
     SELECT s.scientific_name, MIN(s.vernacular_name) AS vernacular_name, g.grp, s.cell_lat, s.cell_lon, s.week::text, SUM(s.count)::int AS n
     FROM species_weekly s JOIN species_group g USING (scientific_name)
-    WHERE s.week <= CURRENT_DATE - 7 AND g.is_species
+    WHERE s.week <= CURRENT_DATE - 7 AND g.is_species ${source ? sql`AND s.source_system = ${source}` : sql``}
     GROUP BY s.scientific_name, g.grp, s.cell_lat, s.cell_lon, s.week
     ORDER BY s.scientific_name, s.cell_lat, s.cell_lon, s.week
   `.cursor(20000, (rows) => {
@@ -102,7 +114,12 @@ export async function recomputePhenology(): Promise<{ pairs: number; seasons: nu
     }
   });
   flush();
+  return { pairs, rows: out };
+}
 
+/** Recompute the phenology table (all sources) that the site's arrival dates come from. */
+export async function recomputePhenology(): Promise<{ pairs: number; seasons: number }> {
+  const { pairs, rows: out } = await computeSeasons();
   await sql.begin(async (tx) => {
     await tx`TRUNCATE phenology`;
     for (let i = 0; i < out.length; i += 2000) await tx`INSERT INTO phenology ${tx(out.slice(i, i + 2000))}`;
