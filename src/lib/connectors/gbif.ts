@@ -9,6 +9,8 @@ import type { PullConnector } from "./types";
  */
 const PAGE = 300;
 const MAX_PAGES = 5;
+/** The live pull runs inside a web request alongside the other connectors, so it gives up quickly when GBIF is throttling. */
+const BUDGET_MS = 45_000;
 
 interface Occ {
   key: number;
@@ -75,6 +77,7 @@ export const gbif: PullConnector = {
     // GBIF only filters lastInterpreted by whole days and cannot sort, so the cursor is a day plus an offset into that day's results.
     // A finished day advances to the next; today keeps its offset so later-indexed records are picked up on later runs.
     const today = new Date().toISOString().slice(0, 10);
+    const t0 = Date.now();
     let { d, o } = cursor ? (JSON.parse(cursor) as { d: string; o: number }) : { d: new Date(Date.now() - 86400_000).toISOString().slice(0, 10), o: 0 };
     const events: WdxEvent[] = [];
     const groups: { name: string; grp: string }[] = [];
@@ -86,7 +89,8 @@ export const gbif: PullConnector = {
       p.set("eventDate", `${new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10)},${today}`);
       p.set("limit", String(PAGE));
       p.set("offset", String(o));
-      const j = await gbifJson<{ results: Occ[]; endOfRecords: boolean }>("/occurrence/search", p);
+      if (Date.now() - t0 > BUDGET_MS) break;
+      const j = await gbifJson<{ results: Occ[]; endOfRecords: boolean }>("/occurrence/search", p, 1);
       for (const occ of j.results) {
         const ev = toWdx(occ);
         if (!ev) continue;

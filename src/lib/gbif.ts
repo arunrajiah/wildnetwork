@@ -33,11 +33,11 @@ export function baseParams(): URLSearchParams {
 }
 
 /** GBIF rate limits bursts (429). Retry with backoff; be polite rather than fast. */
-export async function gbifJson<T>(path: string, params: URLSearchParams): Promise<T> {
+export async function gbifJson<T>(path: string, params: URLSearchParams, retries = 6): Promise<T> {
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(`${GBIF}${path}?${params}`, { headers: { "user-agent": UA, accept: "application/json" } });
+    const res = await fetch(`${GBIF}${path}?${params}`, { headers: { "user-agent": UA, accept: "application/json" }, signal: AbortSignal.timeout(30_000) });
     if (res.ok) return (await res.json()) as T;
-    if ((res.status === 429 || res.status >= 500) && attempt < 6) {
+    if ((res.status === 429 || res.status >= 500) && attempt < retries) {
       await new Promise((r) => setTimeout(r, Math.min(60_000, 1500 * 2 ** attempt)));
       continue;
     }
