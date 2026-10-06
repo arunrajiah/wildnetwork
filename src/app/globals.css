@@ -28,9 +28,9 @@ body {
 /* Map controls sit below the 44px top bar. */
 .maplibregl-map .maplibregl-ctrl-top-right { top: 3.25rem !important; }
 
-/* Marker popups: MapLibre's default is white, which hid the light text. */
-.maplibregl-popup-content { background: #0f172a; color: #e2e8f0; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 10px 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); }
-.maplibregl-popup-anchor-bottom .maplibregl-popup-tip, .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip, .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: #0f172a; }
-.maplibregl-popup-anchor-top .maplibregl-popup-tip, .maplibregl-popup-anchor-top-left .maplibregl-popup-tip, .maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: #0f172a; }
-.maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: #0f172a; }
-.maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: #0f172a; }
+/* Marker popups: MapLibre's own stylesheet loads after this one, so these selectors carry extra specificity to win. */
+.maplibregl-popup .maplibregl-popup-content { background: #0f172a; color: #e2e8f0; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 10px 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); }
+.maplibregl-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip, .maplibregl-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip, .maplibregl-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: #0f172a; }
+.maplibregl-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip, .maplibregl-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip, .maplibregl-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: #0f172a; }
+.maplibregl-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: #0f172a; }
+.maplibregl-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: #0f172a; }
