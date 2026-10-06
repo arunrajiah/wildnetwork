@@ -162,7 +162,6 @@ export default function WorldMap() {
       wantThumbs(ev.features.slice(0, 40).map((f) => String(f.properties.sci)));
     });
     const rest = [
-      fetch(`/api/v1/deployments`).then((r) => r.json() as Promise<FC>).then(setDeployments),
       fetch(`/api/v1/species?hours=${group === "bat" ? 24 : hours}${gq ? "&" + gq : ""}`).then((r) => r.json() as Promise<Species[]>).then((sp) => { setSpeciesList(sp); wantThumbs(sp.slice(0, 15).map((x) => x.scientificName)); }),
       fetch(`/api/v1/insights${gq ? "?" + gq : ""}`).then((r) => r.json() as Promise<Insights>).then((ins) => { setInsights(ins); wantThumbs([...(ins.seasonal ?? []), ...(ins.common ?? []), ...ins.drift, ...ins.movers, ...ins.arrivals].map((x) => x.scientificName)); }),
       fetch(`/api/v1/status`).then((r) => r.json() as Promise<Status>).then(setStatus),
@@ -172,9 +171,17 @@ export default function WorldMap() {
 
   useEffect(() => {
     const t0 = setTimeout(load, 0);
-    const t = setInterval(load, 60_000);
+    const t = setInterval(load, 120_000);
     return () => { clearTimeout(t0); clearInterval(t); };
   }, [load]);
+
+  // Sensor locations change slowly and the response is large: once per visit, then every 10 minutes.
+  useEffect(() => {
+    const get = () => fetch(`/api/v1/deployments`).then((r) => r.json() as Promise<FC>).then(setDeployments).catch(() => {});
+    const t0 = setTimeout(get, 0);
+    const t = setInterval(get, 600_000);
+    return () => { clearTimeout(t0); clearInterval(t); };
+  }, []);
 
   // Change cells for the selected species (recent 3 days vs week before).
   useEffect(() => {

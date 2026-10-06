@@ -92,5 +92,5 @@ export async function GET(req: Request) {
         group: r.grp,
       },
     })),
-  }, { headers: { "cache-control": "public, s-maxage=60, stale-while-revalidate=300" } });
+  }, { headers: { "cache-control": "public, s-maxage=120, stale-while-revalidate=600" } });
 }
