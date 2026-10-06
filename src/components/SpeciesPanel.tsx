@@ -50,6 +50,7 @@ function Line({ values, labels, format, color, title }: { values: (number | null
   );
 }
 
+const SOURCE_LABEL: Record<string, string> = { birdweather: "BirdWeather", gbif: "GBIF", inaturalist: "iNaturalist", wdx: "WDX devices" };
 const CLASS_NOUN: Record<string, string> = { avian: "", bat: "bat", amphibian: "frog", insect: "insect", mammal: "mammal", other: "other" };
 
 interface Arrival { cellLat: number; cellLon: number; region: string; arrivalWeek: string; peakWeek: string; departureWeek: string | null; detections: number }
@@ -122,7 +123,7 @@ export default function SpeciesPanel({ name, onClose }: { name: string; onClose:
         Effort corrected: figures are the species&apos; share of all {CLASS_NOUN[data.group ?? "avian"] || "bird"} detections, so more stations do not look like more animals.{" "}
         <Link href="/methods" className="text-cyan-500 hover:underline">How this is measured, and its limits</Link>.{" "}
         <Link href={`/species/${name.toLowerCase().replace(/\s+/g, "-")}`} className="text-cyan-500 hover:underline">Page for this species</Link>.
-        Sources: {data.sources.join(", ")}. Weather: Open-Meteo ERA5 at the range centre. Map squares show the change in share, last 3 days against the week before.
+        Sources: {data.sources.map((s) => SOURCE_LABEL[s] ?? s).join(", ")}. Weather: Open-Meteo ERA5 at the range centre. Map squares show the change in share, last 3 days against the week before.
         {media?.attribution && <> Photo: {media.attribution} ({media.license}).</>}
       </p>
       </div>

@@ -18,7 +18,7 @@ export default function Methods() {
       <div className="mx-auto max-w-3xl px-5 py-10 text-[15px] leading-relaxed">
         <Link href="/" className="text-sm text-cyan-400 hover:underline">← Back to the map</Link>
         <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-100">Methods</h1>
-        <p className="mt-1 text-sm text-slate-500">Version {METHODS_VERSION} · updated 2 October 2026</p>
+        <p className="mt-1 text-sm text-slate-500">Version {METHODS_VERSION} · updated 6 October 2026</p>
 
         {BIRDWEATHER_PAUSED && <PausedNotice className="mt-6" />}
 

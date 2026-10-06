@@ -66,7 +66,8 @@ export async function englishName(key: number): Promise<string | null> {
     e.n++; votes.set(k, e);
   }
   const best = [...votes.values()].sort((x, y) => y.n - x.n || x.name.length - y.name.length)[0];
-  return best ? best.name.replace(/\b\w/g, (c) => c.toUpperCase()) : null;
+  // Capitalise the first letter of each word only: "Say's Phoebe", "White-throated Sparrow".
+  return best ? best.name.replace(/(^|\s)(\w)/g, (_, sp: string, c: string) => sp + c.toUpperCase()) : null;
 }
 
 /** Class from GBIF's taxonomy: bats are the order Chiroptera, the rest are classes. */
