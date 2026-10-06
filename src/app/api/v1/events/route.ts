@@ -85,7 +85,7 @@ export async function GET(req: Request) {
         common: r.vernacular_name,
         conf: r.confidence,
         source: r.source_system,
-        deployment: r.deployment_id,
+        deployment: r.source_system === "birdweather" ? null : r.deployment_id, // BirdWeather station identity stays with BirdWeather
         media: r.media_url,
         mediaType: r.media_type,
         review: r.review_status,

@@ -11,17 +11,23 @@ export async function GET() {
   `;
   return Response.json({
     type: "FeatureCollection",
-    features: rows.map((r) => ({
+    // BirdWeather stations are BirdWeather's to describe: no name or id, and only an approximate (1 degree) position,
+    // so a station owner's privacy settings are never undermined by a copy here (agreed with BirdWeather, October 2026).
+    features: rows.map((r) => {
+      const bw = r.source_system === "birdweather";
+      const k = bw ? 1 : 1e4;
+      return {
       type: "Feature",
-      geometry: { type: "Point", coordinates: [Math.round(r.longitude * 1e4) / 1e4, Math.round(r.latitude * 1e4) / 1e4] },
+      geometry: { type: "Point", coordinates: [Math.round(r.longitude * k) / k, Math.round(r.latitude * k) / k] },
       properties: {
-        id: r.id,
-        name: r.name,
+        id: bw ? null : r.id,
+        name: bw ? null : r.name,
         source: r.source_system,
         sensorType: r.sensor_type,
         lastSeen: r.last_seen ? new Date(r.last_seen).toISOString().slice(0, 10) : null,
         events24h: Number(r.events_24h),
       },
-    })),
+    };
+    }),
   }, { headers: { "cache-control": "public, s-maxage=600, stale-while-revalidate=3600" } });
 }

@@ -53,6 +53,9 @@ export async function prune(): Promise<void> {
   await sql`DELETE FROM events WHERE source_system IN ('inaturalist', 'gbif') AND event_start < now() - interval '7 days'`;
   await sql`DELETE FROM events WHERE source_system NOT IN ('birdweather', 'inaturalist', 'gbif') AND event_start < now() - interval '30 days'`;
   await sql`DELETE FROM species_daily WHERE day < CURRENT_DATE - 28`;
+  // Stations that stop reporting (removed, or made private) are forgotten after 30 days.
+  await sql`DELETE FROM deployments d WHERE d.source_system = 'birdweather' AND d.last_seen < now() - interval '30 days'
+    AND NOT EXISTS (SELECT 1 FROM events e WHERE e.deployment_id = d.id)`;
 }
 
 export async function pullAll(only?: string | null): Promise<RunResult[]> {

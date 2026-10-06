@@ -50,7 +50,7 @@ export default function AboutPanel() {
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Privacy</h3>
         <p>
-          No account and no ads. Google Analytics counts visits and which features are used, so the project can show funders and researchers that it is used; advertising features are off and no data is sold. If you use the Ask box, your question is sent to an AI model provider and kept for 30 days with a scrambled form of your address.
+          Station owners: to hide a species, a station or a location from WildNetwork, email arunrajiah@gmail.com and it is removed within two days. BirdWeather stations appear only as approximate locations, never by name. No account and no ads. Google Analytics counts visits and which features are used, so the project can show funders and researchers that it is used; advertising features are off and no data is sold. If you use the Ask box, your question is sent to an AI model provider and kept for 30 days with a scrambled form of your address.
         </p>
       </section>
 
