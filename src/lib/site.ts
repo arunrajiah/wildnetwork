@@ -14,5 +14,6 @@ export const DATA_RELEASES: { date: string; url: string; zip: string; weeks: str
     zip: "https://github.com/arunrajiah/wildnetwork/releases/download/data-2026-10-06/wildnetwork-open-2026-10-06.zip",
     weeks: "6 Oct 2025 to 21 Sep 2026",
     rows: { weekly: 376243, effort: 16874, arrivals: 4693, datasets: 284 },
+    doi: "10.5281/zenodo.23193454",
   },
 ];
