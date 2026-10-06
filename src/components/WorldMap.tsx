@@ -124,10 +124,19 @@ export default function WorldMap() {
         const media = p.media
           ? p.mediaType === "audio" ? `<audio controls src="${p.media}" style="width:220px;margin-top:6px"></audio>` : `<img src="${p.media}" style="width:220px;margin-top:6px;border-radius:6px" alt="" />`
           : "";
-        new Popup({ closeButton: false, maxWidth: "260px" })
+        const text = `<b>${p.common ?? p.sci}</b><br/><i>${p.sci ?? ""}</i><br/>${new Date(p.t).toLocaleString()}<br/>confidence ${Number(p.conf).toFixed(2)} · ${p.source}`;
+        const popup = new Popup({ closeButton: false, maxWidth: "260px" })
           .setLngLat((f.geometry as GeoJSON.Point).coordinates as [number, number])
-          .setHTML(`<div style="font:13px system-ui;color:#e2e8f0"><b>${p.common ?? p.sci}</b><br/><i>${p.sci ?? ""}</i><br/>${new Date(p.t).toLocaleString()}<br/>confidence ${Number(p.conf).toFixed(2)} · ${p.source}${media}</div>`)
+          .setHTML(`<div style="font:13px system-ui;color:#e2e8f0">${text}${media}</div>`)
           .addTo(map);
+        // Detections without their own photo or recording get the species photo (Wikipedia / iNaturalist, cached by /api/v1/media).
+        if (!p.media && p.sci) {
+          fetch(`/api/v1/media?names=${encodeURIComponent(p.sci)}`).then((r) => r.json()).then((m: Record<string, { thumbUrl: string | null; attribution: string | null }>) => {
+            const t = m[p.sci];
+            if (!t?.thumbUrl || !popup.isOpen()) return;
+            popup.setHTML(`<div style="font:13px system-ui;color:#e2e8f0">${text}<img src="${t.thumbUrl}" style="width:220px;margin-top:6px;border-radius:6px" alt="" /><div style="font-size:10px;color:#94a3b8;margin-top:2px">${t.attribution ?? ""}</div></div>`);
+          }).catch(() => {});
+        }
       };
       for (const layer of ["events", "events-icons"]) {
         map.on("click", layer, showPopup);
