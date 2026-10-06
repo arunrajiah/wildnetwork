@@ -7,4 +7,12 @@ export const SITE_DESCRIPTION =
 export const speciesSlug = (scientificName: string) => scientificName.toLowerCase().replace(/\s+/g, "-");
 
 /** Open data releases (GBIF-derived only), newest first. Built by scripts/release.mts and attached to a GitHub release. */
-export const DATA_RELEASES: { date: string; url: string; zip: string; weeks: string; rows: { weekly: number; effort: number; arrivals: number; datasets: number }; doi?: string }[] = [];
+export const DATA_RELEASES: { date: string; url: string; zip: string; weeks: string; rows: { weekly: number; effort: number; arrivals: number; datasets: number }; doi?: string }[] = [
+  {
+    date: "2026-10-06",
+    url: "https://github.com/arunrajiah/wildnetwork/releases/tag/data-2026-10-06",
+    zip: "https://github.com/arunrajiah/wildnetwork/releases/download/data-2026-10-06/wildnetwork-open-2026-10-06.zip",
+    weeks: "6 Oct 2025 to 21 Sep 2026",
+    rows: { weekly: 376243, effort: 16874, arrivals: 4693, datasets: 284 },
+  },
+];

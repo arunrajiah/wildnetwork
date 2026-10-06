@@ -56,12 +56,14 @@ await Promise.all(Array.from({ length: 3 }, async () => {
     const f = queue.shift()!;
     try {
       const d = await gbifJson<{ title: string; doi?: string; license?: string }>(`/dataset/${f.name}`, new URLSearchParams());
-      sets.push({ dataset_key: f.name, title: d.title, doi: d.doi ?? "", license: d.license?.includes("zero") ? "CC0 1.0" : "CC BY 4.0", records: f.count });
-    } catch { sets.push({ dataset_key: f.name, title: "", doi: "", license: "", records: f.count }); }
+      // The dataset licence can be stricter than the records counted here: only records licensed CC0 or CC BY 4.0 are used.
+      const lic = d.license ?? "";
+      sets.push({ dataset_key: f.name, title: d.title, doi: d.doi ?? "", dataset_license: lic.includes("zero") ? "CC0 1.0" : lic.includes("by-nc") ? "CC BY-NC 4.0" : lic.includes("/by/") ? "CC BY 4.0" : lic, records_used: f.count });
+    } catch { sets.push({ dataset_key: f.name, title: "", doi: "", dataset_license: "", records_used: f.count }); }
   }
 }));
-sets.sort((a, b) => Number(b.records) - Number(a.records));
-const datasets = await csv("datasets.csv", ["dataset_key", "title", "doi", "license", "records"], [sets]);
+sets.sort((a, b) => Number(b.records_used) - Number(a.records_used));
+const datasets = await csv("datasets.csv", ["dataset_key", "title", "doi", "dataset_license", "records_used"], [sets]);
 
 const doc = `# WildNetwork open data release, ${today}
 
@@ -93,7 +95,7 @@ All records of a class in a cell and week, the denominator for effort correction
 Seasonal timing per species and cell, from this data alone. arrival_week is the first week the species reaches a tenth of its seasonal peak share after at least six weeks below it, in a cell watched in the weeks before. peak_per_1000 is the peak share per 1,000 records of its class. Full definition and known limits: https://wildnetwork.arunrajiah.com/methods
 
 ### datasets.csv (${datasets.toLocaleString("en-GB")} rows)
-The GBIF datasets whose records fall in the classes, licences and weeks above, with record counts and DOIs. Cite them as GBIF asks: https://www.gbif.org/citation-guidelines
+The GBIF datasets whose records fall in the classes and weeks above, with DOIs, the dataset's own licence, and how many of its records were used (only records individually licensed CC0 or CC BY 4.0 are used, even where the dataset as a whole carries a stricter licence such as CC BY-NC). Cite them as GBIF asks: https://www.gbif.org/citation-guidelines
 
 ## Limits
 Counts are records, not animals: they follow where and when people look and report. Coverage is uneven (strongest in northern and western Europe and North America); use effort.csv to judge it. GBIF receives records a week or two after they are made, so the most recent weeks are under-counted and are left out of this release.
