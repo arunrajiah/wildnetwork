@@ -1,7 +1,7 @@
 import { generateKey, hashKey } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
-const SOURCES = ["birdnet-pi", "birdnet-go", "speciesnet", "batdetect2", "megadetector", "wildecho-api", "speciesnet-studio", "animl", "frigate", "other"];
+const SOURCES = ["birdnet-pi", "birdnet-go", "birdecho", "speciesnet", "batdetect2", "megadetector", "wildecho-api", "speciesnet-studio", "animl", "frigate", "other"];
 const PER_IP_PER_DAY = 5;
 
 /**
