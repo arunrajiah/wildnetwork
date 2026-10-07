@@ -23,7 +23,8 @@ export async function POST(req: Request) {
 
   let station;
   try { station = await verifyToken(token); } catch (e) {
-    return Response.json({ error: e instanceof Error ? e.message : "BirdWeather did not accept that token." }, { status: 400 });
+    const msg = e instanceof Error ? e.message : "";
+    return Response.json({ error: msg.includes("token not accepted") ? "BirdWeather did not accept that token. Please copy it again from your station's settings." : msg || "Could not check the token with BirdWeather. Please try again." }, { status: 400 });
   }
 
   if (b.action === "withdraw") {
