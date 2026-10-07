@@ -18,8 +18,8 @@ interface Species { scientificName: string; vernacularName: string | null; count
 interface Insights {
   summary?: string[];
   coverage: { from: string; to: string; species: number; detections: number };
-  movers: { scientificName: string; vernacularName: string | null; yesterday: number; avg7: number; ratio: number }[];
-  drift: { scientificName: string; vernacularName: string | null; region: string; driftDeg: number; latNow: number; n: number }[];
+  movers: { scientificName: string; vernacularName: string | null; yesterday: number; avg7: number; ratio: number; ratioLow?: number | null; ratioHigh?: number | null }[];
+  drift: { scientificName: string; vernacularName: string | null; region: string; driftDeg: number; latNow: number; n: number; driftLow?: number | null; driftHigh?: number | null }[];
   arrivals: { scientificName: string; vernacularName: string | null; cellLat: number; cellLon: number; n: number }[];
   seasonal?: { scientificName: string; vernacularName: string | null; cellLat: number; cellLon: number; week: string; n: number }[];
   common?: { scientificName: string; vernacularName: string | null; n: number; cells: number }[];
@@ -480,15 +480,15 @@ export default function WorldMap() {
                   <Row key={s.scientificName} thumb={thumbs[s.scientificName]} onClick={() => pick(s.scientificName)} name={s.vernacularName ?? s.scientificName} sci={s.scientificName} value={s.n.toLocaleString()} tone="neutral" />
                 ))}
               </Section>
-              <Section title="Moving" hint="Range centre shift per continent, effort corrected">
+              <Section title="Moving" hint="Range centre shift, shown when clear of noise (95%)">
                 {insights?.drift.map((d) => (
-                  <Row key={d.scientificName + d.region} thumb={thumbs[d.scientificName]} onClick={() => pick(d.scientificName)} name={d.vernacularName ?? d.scientificName} sci={`${d.scientificName} · ${d.region}`}
+                  <Row key={d.scientificName + d.region} thumb={thumbs[d.scientificName]} onClick={() => pick(d.scientificName)} name={d.vernacularName ?? d.scientificName} sci={`${d.scientificName} · ${d.region}${d.driftLow != null && d.driftHigh != null ? ` · ${Math.abs(d.driftLow) < Math.abs(d.driftHigh) ? Math.abs(d.driftLow).toFixed(0) : Math.abs(d.driftHigh).toFixed(0)} to ${Math.max(Math.abs(d.driftLow), Math.abs(d.driftHigh)).toFixed(0)}°` : ""}`}
                     value={`${Math.abs(d.driftDeg).toFixed(1)}° ${d.driftDeg > 0 ? "N" : "S"}`} tone={d.driftDeg > 0 ? "warm" : "cool"} />
                 ))}
               </Section>
-              <Section title="Surging and fading" hint="Share of detections, yesterday vs 7 days">
+              <Section title="Surging and fading" hint="Share yesterday vs 7 days, clear of noise (95%)">
                 {insights?.movers.map((m) => (
-                  <Row key={m.scientificName} thumb={thumbs[m.scientificName]} onClick={() => pick(m.scientificName)} name={m.vernacularName ?? m.scientificName} sci={m.scientificName}
+                  <Row key={m.scientificName} thumb={thumbs[m.scientificName]} onClick={() => pick(m.scientificName)} name={m.vernacularName ?? m.scientificName} sci={`${m.scientificName}${m.ratioLow != null && m.ratioHigh != null ? ` · ${m.ratio >= 1 ? "×" + m.ratioLow.toFixed(1) + " to ×" + m.ratioHigh.toFixed(1) : "÷" + (1 / m.ratioHigh).toFixed(1) + " to ÷" + (1 / m.ratioLow).toFixed(1)}` : ""}`}
                     value={`${m.ratio >= 1 ? "×" + m.ratio.toFixed(1) : "÷" + (1 / m.ratio).toFixed(1)}`} tone={m.ratio >= 1 ? "warm" : "cool"} />
                 ))}
               </Section>

@@ -47,7 +47,7 @@ const effort = await csv("effort.csv", ["week", "cell_lat", "cell_lon", "class",
       ORDER BY week, cell_lat, cell_lon, grp`.cursor(20000));
 
 const seasons = (await computeSeasons("gbif")).rows;
-const arrivals = await csv("arrivals.csv", ["scientific_name", "gbif_species_key", "vernacular_name", "cell_lat", "cell_lon", "arrival_week", "peak_week", "departure_week", "peak_per_1000", "records", "weeks_observed", "absent_weeks_before"],
+const arrivals = await csv("arrivals.csv", ["scientific_name", "gbif_species_key", "vernacular_name", "cell_lat", "cell_lon", "arrival_week", "arrival_low", "arrival_high", "arrival_support", "peak_week", "departure_week", "peak_per_1000", "records", "weeks_observed", "absent_weeks_before"],
   [seasons.map((s) => ({ ...s, gbif_species_key: keys.get(String(s.scientific_name)) ?? "", peak_per_1000: Math.round(Number(s.peak_index) * 100) / 100, records: s.total_n, absent_weeks_before: s.absent_weeks }))]);
 
 const taxa = await csv("taxa.csv", ["gbif_species_key", "scientific_name", "vernacular_name", "class", "records", "cells", "weeks"],
@@ -108,7 +108,7 @@ Weeks covered: ${range.first} to ${range.last} (weeks start on Monday). Licence:
 All records of a class in a cell and week, the denominator for effort correction. A species' share of its class (records / effort records) removes most of the difference between busy and quiet places. WildNetwork treats a cell-week as watched by observers at ${OBSERVED.MIN_EFFORT_WEEK} bird records (${OBSERVED.SMALL_MIN_EFFORT_WEEK} for other classes).
 
 ### arrivals.csv (${arrivals.toLocaleString("en-GB")} rows)
-Seasonal timing per species and cell, from this data alone. arrival_week is the first week the species reaches a tenth of its seasonal peak share after at least six weeks below it, in a cell watched in the weeks before. peak_per_1000 is the peak share per 1,000 records of its class. Full definition and known limits: https://wildnetwork.arunrajiah.com/methods
+Seasonal timing per species and cell, from this data alone. arrival_low and arrival_high give a 90% interval for the arrival week, from re-detecting it on weekly counts redrawn 40 times with the series' own overdispersion (gamma-Poisson); arrival_support is the share of those redraws that found a season at all (below 0.5, treat the arrival as weak). arrival_week is the first week the species reaches a tenth of its seasonal peak share after at least six weeks below it, in a cell watched in the weeks before. peak_per_1000 is the peak share per 1,000 records of its class. Full definition and known limits: https://wildnetwork.arunrajiah.com/methods
 
 ### taxa.csv (${taxa.toLocaleString("en-GB")} rows)
 One row per species in this release: GBIF species key, name, English name, class, total records, cells and weeks with records.

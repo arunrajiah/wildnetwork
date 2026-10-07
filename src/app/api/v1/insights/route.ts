@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import { driftIntervals, moverIntervals } from "@/lib/insightsCi";
 import { overview } from "@/lib/story";
 import { GROUPS, METHODS_VERSION, MIN_CELL_DETECTIONS, REGION, minEffortDay, scaled, type Group } from "@/lib/methods";
 
@@ -44,7 +45,7 @@ export async function GET(req: Request) {
       FROM last l JOIN base b USING (scientific_name)
       WHERE b.days >= 5 AND b.avg_n >= ${scaled(100, sql`l.grp`)} AND l.n >= ${scaled(100, sql`l.grp`)}
       ORDER BY ABS(LN(l.share / NULLIF(b.share, 0))) DESC
-      LIMIT 12
+      LIMIT 25
     `,
     // Moving: shift of the share-weighted range centre within one continent, last 3 days against days 8 to 10 ago,
     // using only cells observed for that class in both periods.
@@ -81,7 +82,7 @@ export async function GET(req: Request) {
         AND a.cells >= (CASE WHEN a.grp = 'avian' THEN 3 ELSE 2 END) AND b.cells >= (CASE WHEN a.grp = 'avian' THEN 3 ELSE 2 END)
         AND ABS(a.lat - b.lat) >= 1
       ORDER BY ABS(a.lat - b.lat) DESC
-      LIMIT 12
+      LIMIT 25
     `,
     // New arrivals: present in the last 2 days, absent for the 12 days before,
     // in a cell that was observed for that class on at least 8 of those 12 days.
@@ -109,8 +110,18 @@ export async function GET(req: Request) {
       SELECT MIN(sd.day)::text AS first_day, MAX(sd.day)::text AS last_day, COUNT(DISTINCT sd.scientific_name) AS species, SUM(sd.count) AS detections
       FROM species_daily sd ${group ? sql`JOIN species_group g ON g.scientific_name = sd.scientific_name AND g.grp = ${group}` : sql``}`,
   ]);
-  const driftOut = drift.map((r) => ({ scientificName: r.scientific_name as string, vernacularName: r.vernacular_name as string | null, group: r.grp as string, region: r.region as string, driftDeg: Number(r.drift_deg), latNow: Number(r.lat_now), n: r.n as number, cells: r.cells as number }));
-  const moversOut = movers.map((r) => ({ scientificName: r.scientific_name as string, vernacularName: r.vernacular_name as string | null, group: r.grp as string, yesterday: r.yesterday as number, avg7: r.avg7 as number, ratio: Number(r.ratio) }));
+  const driftAll = drift.map((r) => ({ scientificName: r.scientific_name as string, vernacularName: r.vernacular_name as string | null, group: r.grp as string, region: r.region as string, driftDeg: Number(r.drift_deg), latNow: Number(r.lat_now), n: r.n as number, cells: r.cells as number }));
+  const moversAll = movers.map((r) => ({ scientificName: r.scientific_name as string, vernacularName: r.vernacular_name as string | null, group: r.grp as string, yesterday: r.yesterday as number, avg7: r.avg7 as number, ratio: Number(r.ratio) }));
+  // 95% intervals by resampling cells; a change is listed only when its interval excludes "no change" (see /methods#uncertainty).
+  const [driftCi, moverCi] = await Promise.all([driftIntervals(driftAll), moverIntervals(moversAll)]);
+  const driftOut = driftAll
+    .map((d) => { const ci = driftCi.get(`${d.scientificName}|${d.region}`) ?? null; return { ...d, driftLow: ci ? Math.round(ci[0] * 10) / 10 : null, driftHigh: ci ? Math.round(ci[1] * 10) / 10 : null }; })
+    .filter((d) => d.driftLow != null && d.driftHigh != null && (d.driftLow > 0 || d.driftHigh < 0))
+    .slice(0, 12);
+  const moversOut = moversAll
+    .map((m) => { const ci = moverCi.get(m.scientificName) ?? null; return { ...m, ratioLow: ci ? Math.round(ci[0] * 100) / 100 : null, ratioHigh: ci ? Math.round(ci[1] * 100) / 100 : null }; })
+    .filter((m) => m.ratioLow != null && m.ratioHigh != null && (m.ratioLow > 1 || m.ratioHigh < 1))
+    .slice(0, 12);
   return Response.json({
     methods: METHODS_VERSION,
     group: group ?? "all",

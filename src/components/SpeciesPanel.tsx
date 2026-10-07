@@ -53,7 +53,7 @@ function Line({ values, labels, format, color, title }: { values: (number | null
 const SOURCE_LABEL: Record<string, string> = { birdweather: "BirdWeather", gbif: "GBIF", inaturalist: "iNaturalist", wdx: "WDX devices" };
 const CLASS_NOUN: Record<string, string> = { avian: "", bat: "bat", amphibian: "frog", insect: "insect", mammal: "mammal", other: "other" };
 
-interface Arrival { cellLat: number; cellLon: number; region: string; arrivalWeek: string; peakWeek: string; departureWeek: string | null; detections: number }
+interface Arrival { cellLat: number; cellLon: number; region: string; arrivalWeek: string; arrivalLow?: string | null; arrivalHigh?: string | null; arrivalSupport?: number | null; peakWeek: string; departureWeek: string | null; detections: number }
 interface Media { title: string | null; thumbUrl: string | null; imageUrl: string | null; extract: string | null; pageUrl: string | null; source: string; attribution: string | null; license: string | null }
 
 export default function SpeciesPanel({ name, onClose }: { name: string; onClose: () => void }) {
@@ -143,6 +143,11 @@ function ArrivalTable({ rows, name }: { rows: Arrival[] | null; name: string }) 
   list.forEach((r) => bands.set(r.cellLat, [...(bands.get(r.cellLat) ?? []), r]));
   const median = (xs: string[]) => xs.sort()[Math.floor((xs.length - 1) / 2)];
   const fmt = (d: string) => new Date(d).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  // Typical uncertainty in a band: median half-width of the 90% arrival intervals of its cells, in weeks.
+  const spread = (rs: Arrival[]) => {
+    const w = rs.filter((r) => r.arrivalLow && r.arrivalHigh).map((r) => (Date.parse(r.arrivalHigh!) - Date.parse(r.arrivalLow!)) / (14 * 86400_000)).sort((a, b) => a - b);
+    return w.length ? Math.round(w[Math.floor((w.length - 1) / 2)]) : null;
+  };
   return (
     <div>
       <div className="flex items-baseline justify-between text-xs">
@@ -155,14 +160,14 @@ function ArrivalTable({ rows, name }: { rows: Arrival[] | null; name: string }) 
           {[...bands.entries()].sort((a, b) => b[0] - a[0]).map(([lat, rs]) => (
             <tr key={lat} className="border-t border-white/5 text-slate-200">
               <td className="py-0.5">{Math.abs(lat)}° to {Math.abs(lat + 5)}° {lat >= 0 ? "N" : "S"}</td>
-              <td>{fmt(median(rs.map((r) => r.arrivalWeek)))}</td>
+              <td>{fmt(median(rs.map((r) => r.arrivalWeek)))}{(() => { const s = spread(rs); return s ? <span className="text-slate-500"> ±{s} wk</span> : null; })()}</td>
               <td>{fmt(median(rs.map((r) => r.peakWeek)))}</td>
               <td className="text-right text-slate-400">{rs.length}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="mt-1 text-[11px] text-slate-500">First week the species reaches a tenth of its seasonal peak after at least six weeks away (median across cells). Typically within a week of human sightings, about a week late; for residents it marks the start of singing. <Link href="/validation" className="text-cyan-500 hover:underline">Validation</Link>.</p>
+      <p className="mt-1 text-[11px] text-slate-500">First week the species reaches a tenth of its seasonal peak after at least six weeks away (median across cells; ± is the typical 90% uncertainty). Typically within a week of human sightings, about a week late; for residents it marks the start of singing. <Link href="/validation" className="text-cyan-500 hover:underline">Validation</Link>.</p>
     </div>
   );
 }
@@ -186,7 +191,7 @@ function pearson(a: number[], b: (number | null)[]): number | null {
 }
 
 interface TwoSources {
-  scientificName: string; region: string | null; medianCells?: number; r: number | null; lag: number | null;
+  scientificName: string; region: string | null; medianCells?: number; r: number | null; rInterval?: [number, number] | null; lag: number | null;
   weeks: { week: string; acoustic: { index: number }; observed: { index: number } }[];
   arrival: { acoustic: string | null; observed: string | null };
 }
@@ -198,7 +203,8 @@ function twoSourceWords(d: TwoSources): string[] {
   const out: string[] = [];
   if (d.r != null) {
     const how = d.r >= 0.7 ? "rise and fall together" : d.r >= 0.4 ? "broadly agree" : "tell different stories";
-    out.push(`In ${d.region}, over ${d.weeks.length} weeks in about ${d.medianCells} areas watched by both, recordings and human sightings ${how} (correlation ${d.r.toFixed(2)}).`);
+    const ci = d.rInterval ? `, 95% interval ${d.rInterval[0].toFixed(2)} to ${d.rInterval[1].toFixed(2)}` : "";
+    out.push(`In ${d.region}, over ${d.weeks.length} weeks in about ${d.medianCells} areas watched by both, recordings and human sightings ${how} (correlation ${d.r.toFixed(2)}${ci}).`);
   }
   if (d.lag) out.push(d.lag > 0 ? `Sightings trail recordings by about ${d.lag} week${d.lag > 1 ? "s" : ""}.` : `Recordings trail sightings by about ${-d.lag} week${d.lag < -1 ? "s" : ""}.`);
   const { acoustic: a, observed: o } = d.arrival;

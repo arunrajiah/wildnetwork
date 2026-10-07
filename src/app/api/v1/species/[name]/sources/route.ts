@@ -1,6 +1,7 @@
 import { sql } from "@/lib/db";
 import { METHODS_VERSION, REGION, SMALL_CLASS, minAcousticWeek, minObservedWeek } from "@/lib/methods";
 import { PHENOLOGY, detectSeason, type WeekPoint } from "@/lib/phenology";
+import { corrInterval } from "@/lib/uncertainty";
 
 export const revalidate = 3600;
 
@@ -76,6 +77,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
     medianCells: weeks.map((w) => w.cells).sort((x, y) => x - y)[Math.floor(weeks.length / 2)],
     weeks: weeks.map((w) => ({ week: w.week, cells: w.cells, acoustic: { n: w.acoustic.n, index: Math.round(w.acoustic.index * 100) / 100 }, observed: { n: w.observed.n, index: Math.round(w.observed.index * 100) / 100 } })),
     r: r0 == null ? null : Math.round(r0 * 100) / 100,
+    // 95% interval by resampling 4-week blocks, which keeps the series' autocorrelation (see /methods#uncertainty).
+    rInterval: (() => { const ci = r0 == null ? null : corrInterval(a, o, `sources|${name}`); return ci ? [Math.round(ci[0] * 100) / 100, Math.round(ci[1] * 100) / 100] : null; })(),
     lag: r0 == null ? null : lagOut,
     arrival: { acoustic: season("acoustic"), observed: season("observed") },
   });

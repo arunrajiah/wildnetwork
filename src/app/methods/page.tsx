@@ -3,6 +3,7 @@ import Link from "next/link";
 import PausedNotice from "@/components/PausedNotice";
 import { BIRDWEATHER_PAUSED } from "@/lib/sources";
 import { METHODS_VERSION, MIN_CELL_DETECTIONS, MIN_EFFORT_DAY, MIN_EFFORT_WEEK, OBSERVED, SMALL_CLASS } from "@/lib/methods";
+import { BOOT } from "@/lib/uncertainty";
 
 export const metadata: Metadata = {
   title: "Methods: how wildlife movement is measured",
@@ -18,7 +19,7 @@ export default function Methods() {
       <div className="mx-auto max-w-3xl px-5 py-10 text-[15px] leading-relaxed">
         <Link href="/" className="text-sm text-cyan-400 hover:underline">← Back to the map</Link>
         <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-100">Methods</h1>
-        <p className="mt-1 text-sm text-slate-500">Version {METHODS_VERSION} · updated 6 October 2026</p>
+        <p className="mt-1 text-sm text-slate-500">Version {METHODS_VERSION} · updated 7 October 2026</p>
 
         {BIRDWEATHER_PAUSED && <PausedNotice className="mt-6" />}
 
@@ -217,6 +218,28 @@ export default function Methods() {
           <code className="text-slate-200">/api/v1/coverage</code>.
         </p>
 
+        <H3><span id="uncertainty" className="scroll-mt-6">Uncertainty</span></H3>
+        <p>
+          Every measure that drives a list or a sentence carries an interval from resampling. The generators are seeded, so the same data always gives the same
+          interval. Code: <code className="text-slate-200">src/lib/uncertainty.ts</code> and <code className="text-slate-200">src/lib/insightsCi.ts</code>.
+        </p>
+        <ul className="mt-2 list-disc pl-5 space-y-1">
+          <li><b>Range shift (Moving).</b> The cells behind each period&apos;s range centre are resampled with replacement, {BOOT.B} times, and the shift recomputed;
+            the 95% interval is the middle 95% of those shifts. A species is listed only when the interval excludes zero.</li>
+          <li><b>Surging and fading.</b> The watched cells of the species&apos; class are resampled {BOOT.B} times (the same cells on every day), and the ratio of
+            yesterday&apos;s share to the 7-day share recomputed. Listed only when the 95% interval excludes 1.</li>
+          <li><b>Arrival weeks.</b> Each weekly count is redrawn {BOOT.B_ARRIVAL} times with that count as its mean and the series&apos; own overdispersion (how much its
+            weekly counts scatter around a 3-week moving average beyond Poisson noise, mostly because stations come and go), and the arrival detected again. The 90% interval is reported (weekly steps make 95% intervals mostly the whole window), with the share of redraws that found a season at
+            all; below 0.5, treat the arrival as weak. The arrival table shows the typical half-width as ±weeks.</li>
+          <li><b>Heard versus seen.</b> The correlation&apos;s 95% interval comes from resampling blocks of {BOOT.BLOCK_WEEKS} weeks ({BOOT.B} times), which keeps the
+            series&apos; week-to-week dependence; a plain formula would make it look too certain.</li>
+          <li>Not yet covered: the 30-day sentences in the species panel and the range centre shown on the daily chart.</li>
+        </ul>
+        <p className="mt-2">
+          These intervals capture sampling noise among cells and in counts. They do not capture misidentification by the classifier, or bias from where stations and
+          observers are, which can be larger.
+        </p>
+
         <H2 id="check">4. A worked check</H2>
         <p>
           Wilson&apos;s Warbler (<i>Cardellina pusilla</i>) breeds across boreal Canada and Alaska and winters from Mexico to Panama. Its weekly range centre in
@@ -248,7 +271,7 @@ export default function Methods() {
           <li><b>Thresholds are judgement calls.</b> The minimums on this page were chosen to suppress obvious noise, not derived from a model. They are published so they can be challenged.</li>
           <li><b>Bats are harder than birds.</b> About two thirds of bat detections are identified only to genus, family or order. Species level bat identification from calls is uncertain even for experts, coverage is limited to a few dozen cells, and bat detection scores are on a different scale from bird scores. Nothing about bats has been validated yet. For temperate bats, a seasonal &quot;arrival&quot; is likely emergence from hibernation, not migration.</li>
           <li><b>Acoustic onset is not always arrival.</b> For a resident species the first sustained detections mark the start of singing, not movement. For species that are quiet when they arrive (hummingbirds are the clearest case) the acoustic arrival date can be two to three months late.</li>
-          <li><b>No uncertainty yet.</b> Measures are reported without confidence intervals.</li>
+          <li><b>Uncertainty covers sampling noise only.</b> Intervals (see <a href="#uncertainty" className="text-cyan-400 hover:underline">Uncertainty</a>) do not include classifier errors or where sensors and observers happen to be.</li>
           <li><b>Short history.</b> Daily rollups cover four weeks; weekly rollups go back up to a year but with fewer stations in earlier months.</li>
           <li><b>Weather is a single point.</b> Conditions at the range centre do not describe what a migrating bird experienced along its way, and a correlation over a few weeks is not evidence of cause.</li>
           <li><b>Mixed sources.</b> Acoustic detections and human observations are counted together in the main measures, where recordings dominate (about 3 billion bird detections a year against 8 million records). They are kept apart only in heard versus seen, coverage and the open data release.</li>
@@ -277,6 +300,7 @@ export default function Methods() {
 
         <H2 id="changes">7. Changes</H2>
         <ul className="mt-2 list-disc pl-5 space-y-1">
+          <li><b>0.10</b> (7 October 2026): confidence intervals from resampling for range shifts, surging and fading, arrival weeks and heard versus seen; Moving and Surging lists show only changes whose 95% interval excludes no change.</li>
           <li><b>0.9</b> (6 October 2026): heard versus seen (recordings against human records in the same cells and weeks), a coverage layer, per-source effort, and the first open data release.</li>
           <li><b>0.8</b> (6 October 2026): BirdWeather resumed, detections only (no soundscape links), after BirdWeather confirmed that detections are fine. Its held history was restored, so measures cover both sources again.</li>
           <li><b>0.7</b> (3 October 2026): BirdWeather paused at their request. GBIF added as a source (CC0 and CC BY records only); weekly history for GBIF and iNaturalist now comes from GBIF&apos;s own counts per cell and week rather than from the live window. Thresholds unchanged, so with far fewer detections most cells are &quot;not watched&quot;. Two lists were added to the map panel: &quot;Latest arrivals&quot; (each species&apos; most recent arrival week in the last 120 days, from the arrival dates above) and &quot;Most recorded&quot; (raw record counts over the latest four weeks with data, not effort corrected). GBIF publishes with a delay of one to two weeks, so the day-by-day measures are mostly empty for now.</li>

@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { METHODS_VERSION, MIN_EFFORT_WEEK, OBSERVED, SMALL_CLASS, minEffortWeek } from "@/lib/methods";
+import { BOOT, dispersion, interval, overdispersed, rng, seedOf } from "@/lib/uncertainty";
 
 export interface WeekPoint { week: string; value: number; n: number }
 export interface Season { arrival: string; departure: string | null; peak: string; peakValue: number; total: number; weeks: number; absentWeeks: number }
@@ -93,12 +94,26 @@ export async function computeSeasons(source?: string): Promise<{ pairs: number; 
     pairs++;
     const weeks = effort.get(`${grp}|${cell}`);
     if (!weeks) return;
-    const series: WeekPoint[] = [...weeks.entries()].map(([week, eff]) => { const n = counts.get(week) ?? 0; return { week, n, value: (1000 * n) / eff }; });
-    const s = detectSeason(series, grp === "avian" ? PHENOLOGY : small);
+    const effs = [...weeks.entries()];
+    const series: WeekPoint[] = effs.map(([week, eff]) => { const n = counts.get(week) ?? 0; return { week, n, value: (1000 * n) / eff }; });
+    const limits = grp === "avian" ? PHENOLOGY : small;
+    const s = detectSeason(series, limits);
     if (!s) return;
+    // Uncertainty: redraw every weekly count with the series' own overdispersion and detect again (see /methods#uncertainty).
+    const r = rng(seedOf(`${key}|${source ?? "all"}`));
+    const phi = dispersion(series.map((p) => p.n));
+    const found: number[] = [];
+    for (let b = 0; b < BOOT.B_ARRIVAL; b++) {
+      const alt = effs.map(([week, eff], i): WeekPoint => { const n = overdispersed(series[i].n, phi, r); return { week, n, value: (1000 * n) / eff }; });
+      const sb = detectSeason(alt, limits);
+      if (sb) found.push(Date.parse(sb.arrival));
+    }
+    const ci = interval(found, BOOT.LEVEL_ARRIVAL, 10);
+    const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
     const [lat, lon] = cell.split(",").map(Number);
     out.push({ scientific_name: name, vernacular_name: vern, cell_lat: lat, cell_lon: lon, arrival_week: s.arrival, departure_week: s.departure, peak_week: s.peak,
-      peak_index: s.peakValue, total_n: s.total, weeks_observed: s.weeks, absent_weeks: s.absentWeeks, methods_version: METHODS_VERSION });
+      peak_index: s.peakValue, total_n: s.total, weeks_observed: s.weeks, absent_weeks: s.absentWeeks, methods_version: METHODS_VERSION,
+      arrival_low: ci ? day(ci[0]) : null, arrival_high: ci ? day(ci[1]) : null, arrival_support: Math.round((found.length / BOOT.B_ARRIVAL) * 100) / 100 });
   };
   await sql<{ scientific_name: string; vernacular_name: string | null; grp: string; cell_lat: number; cell_lon: number; week: string; n: number }[]>`
     SELECT s.scientific_name, MIN(s.vernacular_name) AS vernacular_name, g.grp, s.cell_lat, s.cell_lon, s.week::text, SUM(s.count)::int AS n
