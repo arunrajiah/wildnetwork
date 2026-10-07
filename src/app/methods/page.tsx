@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PausedNotice from "@/components/PausedNotice";
 import { BIRDWEATHER_PAUSED } from "@/lib/sources";
-import { METHODS_VERSION, MIN_CELL_DETECTIONS, MIN_EFFORT_DAY, MIN_EFFORT_WEEK, OBSERVED, SMALL_CLASS } from "@/lib/methods";
+import { METHODS_VERSION, MIN_CELL_DETECTIONS, MIN_EFFORT_DAY, MIN_EFFORT_WEEK, OBSERVED, RANGE, SMALL_CLASS } from "@/lib/methods";
 import { BOOT } from "@/lib/uncertainty";
 
 export const metadata: Metadata = {
@@ -136,6 +136,17 @@ export default function Methods() {
           reaches that far. A species and cell qualifies with at least 26 observed weeks, 200 detections and 30 detections in its peak week; the cell must have
           been observed in the week before the arrival, so an outage cannot look like one. Residents, which have no 6 week absence, get no arrival date.
           The species panel shows the median arrival week per 5 degree latitude band. Download: <code className="text-slate-200">/api/v1/arrivals?species=…&amp;format=csv</code>.
+        </p>
+        <p className="mt-3" id="range">
+          <b>Range check.</b> Sound classifiers sometimes mistake one bird for another again and again at the same station, which can look like a season.
+          So a bird is left out of a cell&apos;s arrival dates when GBIF, counting records under every licence since {RANGE.SINCE_YEAR} in that cell and the
+          eight around it, has almost never recorded it there: fewer than {RANGE.MAX_SHARE * 1e6} in a million of the area&apos;s bird records. This only
+          applies where GBIF holds at least {(RANGE.MIN_AREA_RECORDS / 1e6).toLocaleString()} million bird records for the area, because in thinly surveyed
+          places absence from GBIF says little. Names GBIF cannot match are never left out. Classifier labels follow an older bird taxonomy, so a
+          bird also counts as recorded when eBird&apos;s data on GBIF has it under its current name: a new genus with the same species name
+          (Least Bittern is now <i>Botaurus exilis</i>), or one of the species it was split into (American Barn Owl, <i>Tyto furcata</i>). Only counts are read from GBIF, no records are copied, and each
+          area is checked again every {RANGE.RECHECK_DAYS} days. Example: around Boston, GBIF has 99 Eurasian Curlew records among 391 million bird records,
+          so recordings of it there are treated as misidentifications, while Long-eared Owl (about 10,000 records) is kept.
         </p>
         <p className="mt-3">
           These dates were compared with independent human observations: see the <Link href="/validation" className="text-cyan-400 hover:underline">validation</Link>.
@@ -300,6 +311,7 @@ export default function Methods() {
 
         <H2 id="changes">7. Changes</H2>
         <ul className="mt-2 list-disc pl-5 space-y-1">
+          <li><b>0.11</b> (7 October 2026): <a href="#range" className="text-cyan-400 hover:underline">range check</a> for arrival dates: birds that GBIF has almost never recorded around a well surveyed cell no longer get an arrival date there from recordings.</li>
           <li><b>0.10</b> (7 October 2026): confidence intervals from resampling for range shifts, surging and fading, arrival weeks and heard versus seen; Moving and Surging lists show only changes whose 95% interval excludes no change.</li>
           <li><b>0.9</b> (6 October 2026): heard versus seen (recordings against human records in the same cells and weeks), a coverage layer, per-source effort, and the first open data release.</li>
           <li><b>0.8</b> (6 October 2026): BirdWeather resumed, detections only (no soundscape links), after BirdWeather confirmed that detections are fine. Its held history was restored, so measures cover both sources again.</li>

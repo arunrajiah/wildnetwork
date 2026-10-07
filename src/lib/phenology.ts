@@ -84,6 +84,11 @@ export async function computeSeasons(source?: string): Promise<{ pairs: number; 
     effort.get(k)!.set(e.week, e.detections);
   }
 
+  // Range check (methods 0.11): bird recordings GBIF says are far outside the species' range never become arrival dates.
+  // The GBIF-only computation is not filtered: GBIF records are the reference.
+  const outliers = new Set(source === "gbif" ? [] : (await sql<{ k: string }[]>`
+    SELECT scientific_name || '|' || cell_lat || ',' || cell_lon AS k FROM range_outliers`).map((r) => r.k));
+
   const out: Record<string, unknown>[] = [];
   let pairs = 0;
   let key = "", name = "", vern: string | null = null, cell = "", grp = "avian", counts = new Map<string, number>();
@@ -92,6 +97,7 @@ export async function computeSeasons(source?: string): Promise<{ pairs: number; 
   const flush = () => {
     if (!key) return;
     pairs++;
+    if (outliers.has(key)) return;
     const weeks = effort.get(`${grp}|${cell}`);
     if (!weeks) return;
     const effs = [...weeks.entries()];

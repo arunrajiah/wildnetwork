@@ -1,7 +1,7 @@
 import { sql } from "@/lib/db";
 
 /** Version of the published methods. Bump when a measure changes, and add a line to the changelog on /methods. */
-export const METHODS_VERSION = "0.10";
+export const METHODS_VERSION = "0.11";
 
 /** A cell-day needs this many detections of all species before it counts as observed. */
 export const MIN_EFFORT_DAY = 200;
@@ -42,3 +42,8 @@ export const scaled = (n: number, grp = sql`grp`) => sql`(CASE WHEN ${grp} = 'av
 export const OBSERVED = { MIN_EFFORT_WEEK: 100, SMALL_MIN_EFFORT_WEEK: 20 };
 export const minObservedWeek = (grp: string) => (grp === "avian" ? OBSERVED.MIN_EFFORT_WEEK : OBSERVED.SMALL_MIN_EFFORT_WEEK);
 export const minAcousticWeek = (grp: string) => (grp === "avian" ? MIN_EFFORT_WEEK : SMALL_CLASS.MIN_EFFORT_WEEK);
+
+/** Range check (methods 0.11): a bird recorded only by sound is left out of arrival dates in a cell where GBIF, with every
+ * licence counted, has almost never recorded it in that cell or the eight around it, provided the area is well surveyed.
+ * Catches repeated misidentifications by acoustic classifiers (for example Eurasian Curlew around Boston). */
+export const RANGE = { MIN_AREA_RECORDS: 1_000_000, MAX_SHARE: 1e-6, SINCE_YEAR: 2000, RECHECK_DAYS: 180 };

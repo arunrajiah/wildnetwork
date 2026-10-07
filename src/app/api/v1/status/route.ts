@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { pullAll } from "@/lib/connectors";
 import { sql } from "@/lib/db";
+import { refreshRange } from "@/lib/range";
 import { recomputePhenology } from "@/lib/phenology";
 import { refreshRollups } from "@/lib/rollups";
 import { BIRDWEATHER_PAUSED } from "@/lib/sources";
@@ -43,7 +44,7 @@ export async function GET() {
       INSERT INTO pull_state (connector, last_run_at) VALUES ('_phenology_lock', now())
       ON CONFLICT (connector) DO UPDATE SET last_run_at = now() WHERE pull_state.last_run_at < now() - interval '23 hours'
       RETURNING connector`;
-    if (daily.length) await recomputePhenology();
+    if (daily.length) { await refreshRange(60_000).catch(() => null); await recomputePhenology(); }
     // GBIF weekly history: the last 3 weeks, once every 6 hours, within the function's time budget.
     const gb = await sql`
       INSERT INTO pull_state (connector, last_run_at) VALUES ('_gbif_lock', now())
