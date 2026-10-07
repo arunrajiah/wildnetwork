@@ -37,6 +37,10 @@ export default function Contribute() {
         <p className="mt-3">
           Not sure? Look for your station on <A href="https://app.birdweather.com">app.birdweather.com</A>. If it is there, you are included.
         </p>
+        <p className="mt-3">
+          Want more say in how your station appears? <Link href="/stations/join" className="text-cyan-400 hover:underline">Opt it in</Link>: choose a name or stay anonymous,
+          pick how precisely it is located, and share its full daily counts in the open data releases under your licence.
+        </p>
 
         <H2 id="have">I have a device</H2>
         <p>

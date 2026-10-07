@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { sql } from "@/lib/db";
+import { roundTo } from "@/lib/optin";
 
 export const revalidate = 600;
 
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
 const LABEL: Record<string, string> = { birdweather: "BirdWeather stations", inaturalist: "iNaturalist observers", gbif: "GBIF datasets (live)" };
 
 export default async function Stations() {
-  const [bySource, direct] = await Promise.all([
+  const [bySource, direct, optins] = await Promise.all([
     sql<{ source_system: string; active: number; total: number }[]>`
       SELECT source_system, COUNT(*) FILTER (WHERE last_seen > now() - interval '7 days')::int AS active, COUNT(*)::int AS total
       FROM deployments GROUP BY 1 ORDER BY 2 DESC`,
@@ -22,6 +23,11 @@ export default async function Stations() {
              (SELECT COUNT(*) FROM events e WHERE e.deployment_id = d.id)::int AS n
       FROM deployments d WHERE d.source_system NOT IN ('birdweather', 'inaturalist', 'gbif')
       ORDER BY d.last_seen DESC NULLS LAST LIMIT 200`,
+    sql<{ station_id: number; display_name: string | null; station_type: string | null; lat: number | null; lon: number | null; precision_km: number; license: string; species: number; days: number }[]>`
+      SELECT o.station_id, o.display_name, o.station_type, o.lat, o.lon, o.precision_km, o.license,
+             COUNT(DISTINCT d.scientific_name)::int AS species, COUNT(DISTINCT d.day)::int AS days
+      FROM bw_optin o LEFT JOIN bw_optin_daily d USING (station_id)
+      WHERE o.status = 'active' GROUP BY 1 ORDER BY o.created_at`.catch(() => []),
   ]);
   return (
     <main className="min-h-screen bg-slate-950 text-slate-300">
@@ -44,6 +50,30 @@ export default async function Stations() {
             <dd className="text-xs text-slate-400">owner chooses the licence</dd>
           </div>
         </dl>
+
+        <h2 className="mt-10 text-xl font-semibold text-slate-100">BirdWeather stations that opted in</h2>
+        <p className="mt-2">
+          These owners chose to share their station&apos;s full daily counts, under their own licence, at the precision they picked.{" "}
+          <Link href="/stations/join" className="text-cyan-400 hover:underline">Opt your BirdWeather station in</Link>.
+        </p>
+        {optins.length ? (
+          <table className="mt-4 w-full text-sm">
+            <thead><tr className="text-left text-slate-400 border-b border-white/10"><th className="py-1.5 font-medium">Station</th><th className="font-medium">Where</th><th className="font-medium">Licence</th><th className="font-medium text-right">Species</th><th className="font-medium text-right">Days</th></tr></thead>
+            <tbody>
+              {optins.map((o, i) => (
+                <tr key={o.station_id} className="border-b border-white/5">
+                  <td className="py-1.5">{o.display_name ?? `Anonymous station ${i + 1}`}</td>
+                  <td>{o.lat != null && o.lon != null ? `${roundTo(o.lat, o.precision_km)}°, ${roundTo(o.lon, o.precision_km)}° (±${o.precision_km} km)` : ""}</td>
+                  <td>{o.license === "CC0-1.0" ? "CC0" : "CC BY 4.0"}</td>
+                  <td className="text-right">{o.species.toLocaleString("en-GB")}</td>
+                  <td className="text-right">{o.days.toLocaleString("en-GB")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="mt-4 rounded-lg border border-white/10 bg-white/5 p-4">No BirdWeather station has opted in yet. <Link href="/stations/join" className="text-cyan-400 hover:underline">Be the first</Link>.</p>
+        )}
 
         <h2 className="mt-10 text-xl font-semibold text-slate-100">Stations sending directly</h2>
         <p className="mt-2">

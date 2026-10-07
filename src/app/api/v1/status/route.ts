@@ -6,6 +6,7 @@ import { refreshRollups } from "@/lib/rollups";
 import { BIRDWEATHER_PAUSED } from "@/lib/sources";
 import { refreshGbifWeekly } from "@/lib/gbif";
 import { refreshSourceEffort } from "@/lib/rollups";
+import { refreshOptins } from "@/lib/optin";
 
 export const maxDuration = 300;
 
@@ -49,6 +50,14 @@ export async function GET() {
       ON CONFLICT (connector) DO UPDATE SET last_run_at = now() WHERE pull_state.last_run_at < now() - interval '6 hours'
       RETURNING connector`;
     if (gb.length) { await refreshGbifWeekly(3, 200_000); await refreshSourceEffort("28"); }
+  });
+  // Opted-in BirdWeather stations: their own daily counts, every 30 minutes, in their own background task.
+  after(async () => {
+    const oi = await sql`
+      INSERT INTO pull_state (connector, last_run_at) VALUES ('_optin_lock', now())
+      ON CONFLICT (connector) DO UPDATE SET last_run_at = now() WHERE pull_state.last_run_at < now() - interval '30 minutes'
+      RETURNING connector`;
+    if (oi.length) await refreshOptins(90_000);
   });
   return Response.json({
     ask: process.env.ASK_ENABLED === "true" && !BIRDWEATHER_PAUSED,

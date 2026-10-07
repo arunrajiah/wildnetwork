@@ -15,6 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
     { url: `${SITE}/developers`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE}/data`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE}/stations/join`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE}/stations`, lastModified: now, changeFrequency: "daily", priority: 0.6 },
   ];
   // Only species with a seasonal record: those pages have something to say.
