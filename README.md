@@ -214,6 +214,10 @@ This project is one of seven open source tools by [Arun Rajiah](https://www.arun
 
 **Connected today:** wdx-agent sends to WildNetwork in the WDX format, and WildEcho uses wildecho-api. **Planned:** WDX export from BirdEcho, wildecho-api and SpeciesNet Studio.
 
+## Name and logo
+
+The code is open source (AGPL v3). The name "WildNetwork" and the logo are not part of the code licence: forks that run as a public service should use their own name and logo. See [TRADEMARKS.md](TRADEMARKS.md).
+
 ## Contributing and governance
 
 Contributions are welcome: new connectors, better movement analysis, design, documentation, translations, and above all data.

@@ -32,6 +32,7 @@ export default function Home() {
           <Link href="/data">Open data</Link>
           <Link href="/developers">API for developers and researchers</Link>
           <Link href="/stations">Stations</Link>
+          <Link href="/privacy">Privacy</Link>
         </nav>
       </div>
       <WorldMap />

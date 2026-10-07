@@ -1,5 +1,5 @@
 import { BIRDWEATHER_PAUSED } from "@/lib/sources";
-import { hashKey } from "@/lib/auth";
+import { hashIp } from "@/lib/auth";
 import { answerQuestion } from "@/lib/ask";
 import { sql } from "@/lib/db";
 
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   if (question.length > MAX_CHARS) return Response.json({ error: `Please keep the question under ${MAX_CHARS} characters.` }, { status: 400 });
 
   const ip = (req.headers.get("x-forwarded-for") ?? "unknown").split(",")[0].trim();
-  const ipHash = hashKey(`ask:${ip}`);
+  const ipHash = hashIp("ask", ip);
   const qNorm = norm(question);
 
   const [cached] = await sql`

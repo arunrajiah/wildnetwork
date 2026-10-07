@@ -28,3 +28,12 @@ export async function authenticate(req: Request): Promise<ApiKeyInfo | null> {
   const r = rows[0];
   return r ? { id: r.id, name: r.name, sourceSystem: r.source_system } : null;
 }
+
+/**
+ * Visitor addresses are never stored. Rate limits use a keyed hash: without the secret, the hash cannot be reversed
+ * by trying every IPv4 address. The secret is IP_SALT, or CRON_SECRET when IP_SALT is not set.
+ */
+export function hashIp(scope: string, ip: string): string {
+  const salt = process.env.IP_SALT ?? process.env.CRON_SECRET ?? "";
+  return createHash("sha256").update(`${scope}:${salt}:${ip}`).digest("hex");
+}

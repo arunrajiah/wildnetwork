@@ -1,4 +1,4 @@
-import { generateKey, hashKey } from "@/lib/auth";
+import { generateKey, hashKey, hashIp } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
 const SOURCES = ["birdnet-pi", "birdnet-go", "birdecho", "speciesnet", "batdetect2", "megadetector", "wildecho-api", "speciesnet-studio", "animl", "frigate", "other"];
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   if (!SOURCES.includes(source)) return Response.json({ error: `source must be one of: ${SOURCES.join(", ")}` }, { status: 400 });
 
   const ip = (req.headers.get("x-forwarded-for") ?? "unknown").split(",")[0].trim();
-  const ipHash = hashKey(`ip:${ip}`);
+  const ipHash = hashIp("ip", ip);
   const [{ n }] = await sql<{ n: number }[]>`
     SELECT COUNT(*)::int AS n FROM api_keys WHERE created_ip_hash = ${ipHash} AND created_at > now() - interval '1 day'`;
   if (n >= PER_IP_PER_DAY) return Response.json({ error: "too many registrations from this address today" }, { status: 429 });
