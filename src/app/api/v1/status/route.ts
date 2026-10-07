@@ -66,5 +66,5 @@ export async function GET() {
     lastPullAt: newest ? new Date(newest).toISOString() : null,
     connectors: pulls.map((p) => ({ name: p.connector, lastRunAt: p.last_run_at, lastCount: p.last_count, error: p.last_error })),
     events1h: Number(totals[0].events_1h), sensors: Number(totals[0].sensors), detections: Number(totals[0].detections ?? 0), species: Number(totals[0].species),
-  });
+  }, { headers: { "cache-control": "public, s-maxage=30" } });
 }

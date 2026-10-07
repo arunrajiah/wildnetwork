@@ -3,7 +3,6 @@ import { METHODS_VERSION, REGION, SMALL_CLASS, minAcousticWeek, minObservedWeek 
 import { PHENOLOGY, detectSeason, type WeekPoint } from "@/lib/phenology";
 import { corrInterval } from "@/lib/uncertainty";
 
-export const revalidate = 3600;
 
 /**
  * Heard versus seen: one species' weekly rhythm in acoustic detections (BirdWeather) and in human records (GBIF),
@@ -44,7 +43,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
   rows.forEach((r) => byRegion.set(r.region, [...(byRegion.get(r.region) ?? []), r]));
   const best = [...byRegion.entries()].sort((a, b) => b[1].reduce((s, r) => s + r.na + r.no, 0) - a[1].reduce((s, r) => s + r.na + r.no, 0))[0];
   const empty = { scientificName: name, methods: METHODS_VERSION, group: grp, region: null, weeks: [], r: null, lag: null, arrival: { acoustic: null, observed: null } };
-  if (!best || best[1].length < 8) return Response.json(empty);
+  if (!best || best[1].length < 8) return Response.json(empty, { headers: { "cache-control": "public, s-maxage=3600, stale-while-revalidate=86400" } });
 
   const weeks = best[1].map((r) => ({ week: r.week, cells: r.cells, acoustic: { n: r.na, index: (1000 * r.na) / r.ea }, observed: { n: r.no, index: (1000 * r.no) / r.eo } }));
   const a = weeks.map((w) => w.acoustic.index), o = weeks.map((w) => w.observed.index);
@@ -81,5 +80,5 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
     rInterval: (() => { const ci = r0 == null ? null : corrInterval(a, o, `sources|${name}`); return ci ? [Math.round(ci[0] * 100) / 100, Math.round(ci[1] * 100) / 100] : null; })(),
     lag: r0 == null ? null : lagOut,
     arrival: { acoustic: season("acoustic"), observed: season("observed") },
-  });
+  }, { headers: { "cache-control": "public, s-maxage=3600, stale-while-revalidate=86400" } });
 }

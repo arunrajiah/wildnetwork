@@ -19,9 +19,14 @@ export async function GET() {
       return {
       type: "Feature",
       geometry: { type: "Point", coordinates: [Math.round(r.longitude * k) / k, Math.round(r.latitude * k) / k] },
-      properties: {
-        id: bw ? null : r.id,
-        name: bw ? null : r.name,
+      properties: bw ? {
+        source: r.source_system,
+        sensorType: r.sensor_type,
+        lastSeen: r.last_seen ? new Date(r.last_seen).toISOString().slice(0, 10) : null,
+        events24h: Number(r.events_24h),
+      } : {
+        id: r.id,
+        name: r.name,
         source: r.source_system,
         sensorType: r.sensor_type,
         lastSeen: r.last_seen ? new Date(r.last_seen).toISOString().slice(0, 10) : null,

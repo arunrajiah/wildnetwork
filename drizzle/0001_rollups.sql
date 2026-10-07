@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS species_daily (
   sites           integer,             -- distinct deployments (null when unknown)
   PRIMARY KEY (day, source_system, scientific_name, cell_lat, cell_lon)
 );
-CREATE INDEX IF NOT EXISTS species_daily_species_idx ON species_daily (scientific_name, day);
 CREATE INDEX IF NOT EXISTS species_daily_day_idx ON species_daily (day);
 
 -- Hourly weather per 1-degree cell (Open-Meteo), joined to events by cell + hour.

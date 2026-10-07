@@ -133,5 +133,5 @@ export async function GET(req: Request) {
     movers: moversOut,
     drift: driftOut,
     arrivals: arrivals.map((r) => ({ scientificName: r.scientific_name, vernacularName: r.vernacular_name, group: r.grp, cellLat: r.cell_lat, cellLon: r.cell_lon, n: r.n })),
-  }, { headers: { "cache-control": "public, s-maxage=300, stale-while-revalidate=600" } });
+  }, { headers: { "cache-control": "public, s-maxage=1800, stale-while-revalidate=86400" } });
 }

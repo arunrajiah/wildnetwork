@@ -2,7 +2,6 @@ import { sql } from "@/lib/db";
 import { METHODS_VERSION, minEffortDay } from "@/lib/methods";
 import { getClimate, getYearSpan, speciesStory, type DayPoint } from "@/lib/story";
 
-export const revalidate = 600;
 
 /**
  * One species over time, effort corrected: daily index, share-weighted range centre, per-cell change, and weather at the centre.
@@ -105,5 +104,5 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
     daily: daily.map((d) => ({ day: d.day, n: d.n, high: d.high, effort: Number(d.effort), index: Number(d.idx), lat: d.lat == null ? null : Number(d.lat), lon: d.lon == null ? null : Number(d.lon), cells: d.cells, weather: weather[String(d.day)] ?? null })),
     // recent / earlier are per-1,000 shares; null when the cell was not observed enough in that period
     cells: cells.map((c) => ({ lat: c.cell_lat, lon: c.cell_lon, n: c.n, recent: c.recent == null ? null : Number(c.recent), earlier: c.earlier == null ? null : Number(c.earlier) })),
-  });
+  }, { headers: { "cache-control": "public, s-maxage=600, stale-while-revalidate=3600" } });
 }

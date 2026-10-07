@@ -1,7 +1,6 @@
 import { sql } from "@/lib/db";
 import { METHODS_VERSION, REGION, minEffortWeek } from "@/lib/methods";
 
-export const revalidate = 3600;
 
 /**
  * Weekly frames for one species over the past year, effort corrected.
@@ -42,5 +41,5 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
       cells: f.cells, // [lat, lon, detections, per-1000 share]
       centroids: [...f.regions.entries()].map(([region, g]) => ({ region, n: g.n, lat: g.lat / g.w, lon: g.lon / g.w })),
     })),
-  });
+  }, { headers: { "cache-control": "public, s-maxage=3600, stale-while-revalidate=86400" } });
 }

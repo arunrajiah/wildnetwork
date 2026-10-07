@@ -80,19 +80,20 @@ export async function GET(req: Request) {
     features: rows.map((r) => ({
       type: "Feature",
       geometry: { type: "Point", coordinates: r.source_system === "birdweather" ? [Math.round(r.longitude), Math.round(r.latitude)] : [r.longitude, r.latitude] },
-      properties: {
+      // Empty fields are left out: the map fetches up to 20,000 of these every few minutes.
+      properties: Object.fromEntries(Object.entries({
         id: r.event_id,
         t: r.event_start,
         sci: r.scientific_name,
         common: r.vernacular_name,
-        conf: r.confidence,
+        conf: Math.round(r.confidence * 100) / 100,
         source: r.source_system,
         deployment: r.source_system === "birdweather" ? null : r.deployment_id, // BirdWeather station identity stays with BirdWeather
         media: r.media_url,
         mediaType: r.media_type,
-        review: r.review_status,
+        review: r.review_status === "unreviewed" ? null : r.review_status,
         group: r.grp,
-      },
+      }).filter(([, v]) => v != null)),
     })),
   }, { headers: { "cache-control": "public, s-maxage=120, stale-while-revalidate=600" } });
 }
