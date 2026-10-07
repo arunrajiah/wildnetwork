@@ -21,7 +21,8 @@
           { "name": "group", "in": "query", "schema": { "$ref": "#/components/schemas/Group" } },
           { "name": "minConfidence", "in": "query", "schema": { "type": "number", "minimum": 0, "maximum": 1 } },
           { "name": "bbox", "in": "query", "schema": { "type": "string" }, "description": "west,south,east,north in degrees" },
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 5000, "maximum": 20000 } }
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 5000, "maximum": 20000 } },
+          { "name": "merge", "in": "query", "description": "1 = merge BirdWeather detections of one species at the same 1 degree position within 15 minutes into one point with a count n", "schema": { "type": "string", "enum": ["1"] } }
         ],
         "responses": { "200": { "description": "GeoJSON FeatureCollection; properties: id, t, sci, common, conf, source, grp, media, mediaType" } }
       },
