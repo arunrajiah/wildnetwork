@@ -109,7 +109,7 @@ All read endpoints are public and need no key.
 | `GET /api/v1/species?hours=24&q=robin` | Species ranked by detections |
 | `GET /api/v1/species/{scientific name}` | 30 day series, range centre, weather |
 | `GET /api/v1/species/{scientific name}/movement` | Weekly frames for the past year |
-| `GET /api/v1/arrivals?species=&format=csv` | Arrival, peak and departure week per species and cell ([validated](https://wildnetwork.arunrajiah.com/validation)) |
+| `GET /api/v1/arrivals?species=&lat=&lon=&format=csv` | Arrival, peak and departure week per species and cell ([validated](https://wildnetwork.arunrajiah.com/validation)) |
 | `?group=bat` on events, species, insights, arrivals | Limit to one class: `avian`, `bat`, `amphibian`, `insect`, `mammal` |
 | `GET /api/v1/insights` | Moving, surging, fading, arriving (effort corrected, with the methods version) |
 | `GET /api/v1/media?names=A,B` | Species photo and description with attribution |

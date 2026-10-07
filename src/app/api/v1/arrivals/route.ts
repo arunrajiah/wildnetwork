@@ -7,20 +7,26 @@ export const revalidate = 3600;
  * Seasonal timing per species and 5-degree cell (see /methods, "Arrival dates").
  * ?species=Hirundo rustica   all cells for one species
  * (no species)               the most recent arrivals across all species
+ * ?lat=51.5&lon=-0.1          only the 5-degree cell containing that point (all species there,
+ *                            or one row with ?species); used by BirdEcho's "near you" lists
  * ?format=csv                same rows as CSV
  */
 export async function GET(req: Request) {
   const p = new URL(req.url).searchParams;
   const species = p.get("species");
   const group = p.get("group");
+  const lat = Number(p.get("lat")), lon = Number(p.get("lon"));
+  const cell = p.has("lat") && p.has("lon") && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
+    ? { lat: Math.floor(lat / 5) * 5, lon: Math.floor(lon / 5) * 5 } : null;
   const rows = await sql`
     SELECT scientific_name, vernacular_name, cell_lat, cell_lon, ${REGION} AS region,
            arrival_week::text, peak_week::text, departure_week::text, peak_index, total_n, weeks_observed, absent_weeks
     FROM phenology
-    ${species ? sql`WHERE scientific_name = ${species}` : sql`WHERE arrival_week >= CURRENT_DATE - 28`}
+    ${species ? sql`WHERE scientific_name = ${species}` : cell ? sql`WHERE true` : sql`WHERE arrival_week >= CURRENT_DATE - 28`}
+    ${cell ? sql`AND cell_lat = ${cell.lat} AND cell_lon = ${cell.lon}` : sql``}
     ${group ? sql`AND scientific_name IN (SELECT scientific_name FROM species_group WHERE grp = ${group})` : sql``}
     ORDER BY ${species ? sql`cell_lat DESC, cell_lon` : sql`arrival_week DESC, total_n DESC`}
-    LIMIT ${species ? 500 : 200}
+    LIMIT ${species || cell ? 500 : 200}
   `;
   const out = rows.map((r) => ({
     scientificName: r.scientific_name, vernacularName: r.vernacular_name, cellLat: r.cell_lat, cellLon: r.cell_lon, region: r.region,
