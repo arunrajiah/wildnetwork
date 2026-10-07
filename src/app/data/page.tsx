@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { METHODS_VERSION, OBSERVED } from "@/lib/methods";
-import { DATA_RELEASES } from "@/lib/site";
+import { DATA_CONCEPT_DOI, DATA_RELEASES } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Open data: weekly wildlife records, effort and arrival dates",
@@ -31,8 +31,10 @@ export default function Data() {
               <li><b>weekly_records.csv</b>: {latest.rows.weekly.toLocaleString("en-GB")} rows (week, cell, class, species, records)</li>
               <li><b>effort.csv</b>: {latest.rows.effort.toLocaleString("en-GB")} rows (all records of a class per cell and week)</li>
               <li><b>arrivals.csv</b>: {latest.rows.arrivals.toLocaleString("en-GB")} rows (arrival, peak and departure week per species and cell)</li>
+              {latest.rows.taxa ? <li><b>taxa.csv</b>: {latest.rows.taxa.toLocaleString("en-GB")} species with their GBIF species keys (every file carries the key: join on it, not on names)</li> : null}
               <li><b>datasets.csv</b>: {latest.rows.datasets.toLocaleString("en-GB")} contributing GBIF datasets with DOIs, for citation</li>
             </ul>
+            {latest.notes && <p className="mt-2 text-sm text-slate-400">{latest.notes}</p>}
             <p className="mt-3 flex flex-wrap gap-3">
               <a href={latest.zip} className="inline-block rounded-md bg-cyan-500 px-4 py-2 font-medium text-slate-950 hover:bg-cyan-400">Download (zip)</a>
               <a href={latest.url} className="inline-block rounded-md border border-white/15 px-4 py-2 text-slate-200 hover:bg-white/5">Release notes</a>
@@ -40,6 +42,17 @@ export default function Data() {
           </section>
         ) : (
           <p className="mt-6 rounded-lg border border-white/10 bg-white/5 p-4 text-sm">The first release is being prepared.</p>
+        )}
+
+        {DATA_RELEASES.length > 1 && (
+          <>
+            <h2 className="mt-8 text-xl font-semibold text-slate-100">Earlier releases</h2>
+            <ul className="mt-2 list-disc pl-5 space-y-1 text-sm">
+              {DATA_RELEASES.slice(1).map((r) => (
+                <li key={r.date}>{fmt(r.date)}: <a href={r.zip} className="text-cyan-400 hover:underline">zip</a>{r.doi ? <>, DOI <a href={`https://doi.org/${r.doi}`} className="text-cyan-400 hover:underline">{r.doi}</a></> : null}</li>
+              ))}
+            </ul>
+          </>
         )}
 
         <h2 className="mt-8 text-xl font-semibold text-slate-100">What is in it</h2>
@@ -58,7 +71,8 @@ export default function Data() {
 
         <h2 className="mt-8 text-xl font-semibold text-slate-100">Citing</h2>
         <p className="mt-2">
-          Cite the release you used{latest?.doi ? " by its DOI" : ""}, and the GBIF datasets listed in datasets.csv as GBIF asks
+          Cite the release you used{latest?.doi ? " by its DOI" : ""} (to refer to the data in general, the DOI{" "}
+          <a href={`https://doi.org/${DATA_CONCEPT_DOI}`} className="text-cyan-400 hover:underline">{DATA_CONCEPT_DOI}</a> always points to the newest release), and the GBIF datasets listed in datasets.csv as GBIF asks
           (<a href="https://www.gbif.org/citation-guidelines" className="text-cyan-400 hover:underline">GBIF citation guidelines</a>). Each release folder has a CITATION.cff file.
         </p>
 
