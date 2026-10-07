@@ -1,0 +1,80 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "WildNetwork open API",
+    "version": "1",
+    "description": "Read access to WildNetwork's live map and effort-corrected measures, and authenticated push of WDX detection events. Responses mix sources, including BirdWeather detections shown with BirdWeather's agreement for display only: use the API to view and explore, and the citable open data releases (https://wildnetwork.arunrajiah.com/data) for analysis and redistribution. No key is needed to read; please keep to about one request per second.",
+    "license": { "name": "AGPL-3.0 (code)", "url": "https://github.com/arunrajiah/wildnetwork/blob/main/LICENSE" },
+    "contact": { "email": "arunrajiah@gmail.com", "url": "https://wildnetwork.arunrajiah.com/developers" }
+  },
+  "servers": [{ "url": "https://wildnetwork.arunrajiah.com" }],
+  "paths": {
+    "/api/v1/status": { "get": { "summary": "Ingest health and totals", "responses": { "200": { "description": "live flag, last pull time, connector states, totals" } } } },
+    "/api/v1/events": {
+      "get": {
+        "summary": "Live detections as GeoJSON (a sample of the newest, see /methods)",
+        "parameters": [
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" }, "description": "default: 24 hours before `to`" },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" }, "description": "default: now" },
+          { "name": "species", "in": "query", "schema": { "type": "string" }, "description": "scientific name" },
+          { "name": "source", "in": "query", "schema": { "type": "string", "enum": ["birdweather", "gbif", "inaturalist", "birdnet-pi", "birdnet-go", "birdecho"] } },
+          { "name": "group", "in": "query", "schema": { "$ref": "#/components/schemas/Group" } },
+          { "name": "minConfidence", "in": "query", "schema": { "type": "number", "minimum": 0, "maximum": 1 } },
+          { "name": "bbox", "in": "query", "schema": { "type": "string" }, "description": "west,south,east,north in degrees" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 5000, "maximum": 20000 } }
+        ],
+        "responses": { "200": { "description": "GeoJSON FeatureCollection; properties: id, t, sci, common, conf, source, grp, media, mediaType" } }
+      },
+      "post": {
+        "summary": "Push WDX 0.1 detection events (single event, JSON array or NDJSON, up to 5,000 per request)",
+        "security": [{ "bearer": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "https://raw.githubusercontent.com/arunrajiah/wildlife-detection-exchange/main/schema/detection-event.schema.json" } } } },
+        "responses": { "200": { "description": "received, inserted, updated, rejected, rejectedDetails" }, "401": { "description": "missing or invalid key" }, "413": { "description": "more than 5,000 events" } }
+      }
+    },
+    "/api/v1/register": {
+      "post": {
+        "summary": "Get a push key for a device (shown once, restricted to one source system; 5 per IP per day)",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["name", "source"], "properties": { "name": { "type": "string" }, "source": { "type": "string", "enum": ["birdnet-pi", "birdnet-go", "birdecho", "speciesnet", "batdetect2", "megadetector", "wildecho-api", "speciesnet-studio", "animl", "frigate", "other"] }, "contact": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "apiKey, source, endpoint" } }
+      }
+    },
+    "/api/v1/deployments": { "get": { "summary": "Sensor locations as GeoJSON (BirdWeather stations rounded to 1 degree, without names)", "responses": { "200": { "description": "GeoJSON FeatureCollection" } } } },
+    "/api/v1/species": {
+      "get": {
+        "summary": "Species in the live window, or search all species",
+        "parameters": [
+          { "name": "hours", "in": "query", "schema": { "type": "integer", "default": 24, "maximum": 720 } },
+          { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "search scientific and English names" },
+          { "name": "group", "in": "query", "schema": { "$ref": "#/components/schemas/Group" } }
+        ],
+        "responses": { "200": { "description": "array of { scientificName, vernacularName, count, deployments }" } }
+      }
+    },
+    "/api/v1/species/{name}": { "get": { "summary": "One species, last 30 days, effort corrected: daily index, range centre, weather at the centre, change per cell, text summary", "parameters": [{ "$ref": "#/components/parameters/Name" }], "responses": { "200": { "description": "species detail" } } } },
+    "/api/v1/species/{name}/movement": { "get": { "summary": "Weekly frames for the past year: share per 5 degree cell and range centre per continent", "parameters": [{ "$ref": "#/components/parameters/Name" }], "responses": { "200": { "description": "frames[]: week, total, index, cells [lat, lon, detections, per-1000 share], centroids" } } } },
+    "/api/v1/species/{name}/sources": { "get": { "summary": "Heard versus seen: recordings against human records in the same cells and weeks", "parameters": [{ "$ref": "#/components/parameters/Name" }], "responses": { "200": { "description": "region, weeks[], r, lag, arrival per source" } } } },
+    "/api/v1/arrivals": {
+      "get": {
+        "summary": "Arrival, peak and departure weeks per species and 5 degree cell",
+        "parameters": [
+          { "name": "species", "in": "query", "schema": { "type": "string" } },
+          { "name": "group", "in": "query", "schema": { "$ref": "#/components/schemas/Group" } },
+          { "name": "lat", "in": "query", "schema": { "type": "number" }, "description": "with lon: only the cell containing this point" },
+          { "name": "lon", "in": "query", "schema": { "type": "number" } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
+        ],
+        "responses": { "200": { "description": "arrivals[]" } }
+      }
+    },
+    "/api/v1/insights": { "get": { "summary": "What is changing now: moving, surging and fading, new and latest arrivals, most recorded, text summary", "parameters": [{ "name": "group", "in": "query", "schema": { "$ref": "#/components/schemas/Group" } }], "responses": { "200": { "description": "insights" } } } },
+    "/api/v1/coverage": { "get": { "summary": "Which 5 degree cells are watched by recordings, sightings, both, or too thin", "responses": { "200": { "description": "thresholds, summary, cells[]" } } } },
+    "/api/v1/media": { "get": { "summary": "Species photo and short description (Wikipedia, iNaturalist)", "parameters": [{ "name": "names", "in": "query", "required": true, "schema": { "type": "string" }, "description": "comma separated scientific names, up to 40" }], "responses": { "200": { "description": "map of name to media" } } } },
+    "/api/v1/sources": { "get": { "summary": "GBIF datasets seen in the live pull, for credits", "responses": { "200": { "description": "gbif[]" } } } }
+  },
+  "components": {
+    "parameters": { "Name": { "name": "name", "in": "path", "required": true, "schema": { "type": "string" }, "description": "scientific name, URL encoded, e.g. Hirundo%20rustica" } },
+    "schemas": { "Group": { "type": "string", "enum": ["avian", "bat", "amphibian", "insect", "mammal"] } },
+    "securitySchemes": { "bearer": { "type": "http", "scheme": "bearer" } }
+  }
+}

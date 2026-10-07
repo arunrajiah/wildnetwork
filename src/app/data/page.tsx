@@ -64,7 +64,7 @@ export default function Data() {
 
         <h2 className="mt-8 text-xl font-semibold text-slate-100">Live access</h2>
         <p className="mt-2">
-          For current figures use the open API: <code className="text-slate-200">/api/v1/coverage</code> (who watches each cell), <code className="text-slate-200">/api/v1/arrivals?species=…&amp;format=csv</code>,{" "}
+          For current figures use the open API (<Link href="/developers" className="text-cyan-400 hover:underline">documentation and R and Python examples</Link>): <code className="text-slate-200">/api/v1/coverage</code> (who watches each cell), <code className="text-slate-200">/api/v1/arrivals?species=…&amp;format=csv</code>,{" "}
           <code className="text-slate-200">/api/v1/species/…/movement</code>. API responses mix sources and are for viewing; for analysis, use the releases.
         </p>
       </div>
