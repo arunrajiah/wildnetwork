@@ -2,7 +2,7 @@
 
 import PausedNotice from "@/components/PausedNotice";
 import Link from "next/link";
-import { AttributionControl, Map as MLMap, NavigationControl, Popup, setWorkerUrl, type GeoJSONSource, type MapLayerMouseEvent } from "maplibre-gl";
+import type { GeoJSONSource, Map as MLMap, MapLayerMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ICON_IMAGE, registerIcons } from "@/lib/mapIcons";
@@ -11,7 +11,6 @@ import AskPanel from "./AskPanel";
 import { track } from "./Analytics";
 import SpeciesPanel, { type SpeciesDetail } from "./SpeciesPanel";
 
-setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
 type FC = GeoJSON.FeatureCollection<GeoJSON.Geometry, Record<string, unknown>>;
 interface Species { scientificName: string; vernacularName: string | null; count: number; deployments: number }
@@ -78,12 +77,19 @@ export default function WorldMap() {
   const [mvPlaying, setMvPlaying] = useState(false);
 
   const thumbsRef = useRef<Record<string, string | null>>({});
+  // Merged BirdWeather points carry a count n, so totals add those up rather than counting points.
+  const detections = useMemo(() => events.features.reduce((t, f) => t + (Number(f.properties?.n) || 1), 0), [events]);
   const liveHours = group === "bat" && !species ? 24 : hours; // the bat layer covers a day
   const windowStart = useMemo(() => fetchedAt - liveHours * 3600_000, [fetchedAt, liveHours]);
 
+  // MapLibre (about 300 KB compressed) is loaded after the page is interactive, so the panels and data requests do not wait for it.
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
-    const map = new MLMap({ container: containerRef.current, style: STYLE, center: [10, 25], zoom: 1.7, minZoom: 1.3, renderWorldCopies: false, attributionControl: false });
+    let cancelled = false;
+    let mapInstance: MLMap | null = null;
+    import("maplibre-gl").then(({ AttributionControl, Map: MLMapClass, NavigationControl, Popup, setWorkerUrl }) => {
+    if (cancelled || !containerRef.current || mapRef.current) return;
+    setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+    const map = new MLMapClass({ container: containerRef.current, style: STYLE, center: [10, 25], zoom: 1.7, minZoom: 1.3, renderWorldCopies: false, attributionControl: false });
     map.addControl(new AttributionControl({ compact: true, customAttribution: "BirdWeather · GBIF publishers (CC0/CC BY) · iNaturalist (CC0/CC-BY) · WDX producers" }));
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     map.on("load", () => {
@@ -139,7 +145,7 @@ export default function WorldMap() {
         const media = p.media && /^https:\/\//.test(p.media)
           ? p.mediaType === "audio" ? `<audio controls src="${esc(p.media)}" style="width:220px;margin-top:6px"></audio>` : `<img src="${esc(p.media)}" style="width:220px;margin-top:6px;border-radius:6px" alt="" />`
           : "";
-        const text = `<b>${esc(p.common ?? p.sci)}</b><br/><i>${esc(p.sci)}</i><br/>${new Date(p.t).toLocaleString()}<br/>confidence ${Number(p.conf).toFixed(2)} · ${esc(p.source)}`;
+        const text = `<b>${esc(p.common ?? p.sci)}</b><br/><i>${esc(p.sci)}</i><br/>${new Date(p.t).toLocaleString()}<br/>${Number(p.n) > 1 ? `${Number(p.n)} detections nearby in 15 min, best ` : ""}confidence ${Number(p.conf).toFixed(2)} · ${esc(p.source)}`;
         const popup = new Popup({ closeButton: false, maxWidth: "260px" })
           .setLngLat((f.geometry as GeoJSON.Point).coordinates as [number, number])
           .setHTML(`<div style="font:13px system-ui;color:#e2e8f0">${text}${media}</div>`)
@@ -162,14 +168,16 @@ export default function WorldMap() {
     });
     mapRef.current = map;
     (window as unknown as { __wnMap?: MLMap }).__wnMap = map;
-    return () => { map.remove(); mapRef.current = null; };
+    mapInstance = map;
+    });
+    return () => { cancelled = true; mapInstance?.remove(); mapRef.current = null; };
   }, []);
 
   // Each request paints as soon as it arrives; the map never waits for the slowest one.
   const load = useCallback(async () => {
     const windowHours = group === "bat" && !species ? 24 : hours; // bats are sparse and nocturnal, so their live window is a day
     const from = new Date(Math.floor((Date.now() - windowHours * 3600_000) / 300_000) * 300_000).toISOString(); // 5 minute steps, cacheable
-    const u = new URLSearchParams({ from, limit: "20000" });
+    const u = new URLSearchParams({ from, limit: "20000", merge: "1" });
     if (species) u.set("species", species);
     else if (group !== "all") u.set("group", group);
     const gq = group !== "all" ? `group=${group}` : "";
@@ -438,15 +446,15 @@ export default function WorldMap() {
             <AskPanel onPick={pick} />
           ) : tab === "feed" ? (
             <div className="flex-1 overflow-y-auto">
-              <div className="px-4 py-2 text-[11px] text-slate-500 border-b border-white/5">{loading ? "Loading latest detections" : `Latest detections · ${events.features.length.toLocaleString()}`} in the last {hours < 24 ? hours + "h" : hours / 24 + "d"}</div>
-              {events.features.slice(0, 200).map((f) => {
+              <div className="px-4 py-2 text-[11px] text-slate-500 border-b border-white/5">{loading ? "Loading latest detections" : `Latest detections · ${detections.toLocaleString()}`} in the last {hours < 24 ? hours + "h" : hours / 24 + "d"}</div>
+              {events.features.slice(0, 200).map((f, i) => {
                 const p = f.properties as Record<string, string>;
                 return (
-                  <div key={p.id} className="flex items-center gap-3 h-[3.85rem] px-3 border-b border-white/5 hover:bg-white/5">
+                  <div key={p.id ?? `m${i}`} className="flex items-center gap-3 h-[3.85rem] px-3 border-b border-white/5 hover:bg-white/5">
                     <button onClick={() => pick(p.sci)} className="shrink-0"><Thumb src={thumbs[p.sci]} size={10} /></button>
                     <button onClick={() => pick(p.sci)} className="min-w-0 flex-1 text-left">
                       <div className="text-sm truncate">{p.common ?? p.sci}</div>
-                      <div className="text-[11px] text-slate-500 truncate">{p.source} · conf {Number(p.conf).toFixed(2)}</div>
+                      <div className="text-[11px] text-slate-500 truncate">{p.source}{Number(p.n) > 1 ? ` · ${p.n} detections` : ""} · conf {Number(p.conf).toFixed(2)}</div>
                     </button>
                     <span className="text-[11px] text-slate-400 tabular-nums shrink-0">{relTime(p.t)}</span>
                     <button onClick={() => flyTo(f)} aria-label="Jump to location" className="shrink-0 w-7 h-7 rounded hover:bg-white/10 text-slate-400 hover:text-white grid place-items-center">
@@ -585,7 +593,7 @@ export default function WorldMap() {
           onChange={(e) => { setPlaying(false); setPlayhead(Number(e.target.value)); }} className="flex-1 accent-[#006cd9]" />
         <button onClick={() => { setPlaying(false); setPlayhead(null); }} className="text-xs text-slate-400 hover:text-white">All</button>
         <span className="text-xs text-slate-300 tabular-nums w-40 text-right hidden sm:inline">
-          {loading ? "Loading" : playhead === null ? `${events.features.length.toLocaleString()} events` : new Date(windowStart + playhead).toLocaleString()}
+          {loading ? "Loading" : playhead === null ? `${detections.toLocaleString()} detections` : new Date(windowStart + playhead).toLocaleString()}
         </span>
           </>
         )}

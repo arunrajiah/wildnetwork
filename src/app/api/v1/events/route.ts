@@ -56,8 +56,38 @@ export async function GET(req: Request) {
   const bbox = p.get("bbox")?.split(",").map(Number);
   const hasBbox = bbox?.length === 4 && bbox.every((n) => Number.isFinite(n));
 
-  const rows = await sql`
-    SELECT e.event_id, e.event_start, e.scientific_name, e.vernacular_name, e.confidence,
+  // ?merge=1 (used by the map): BirdWeather detections share 1 degree positions, so the same species in the same place within
+  // 15 minutes becomes one point with a count n, the latest time and the highest confidence. Other sources stay one point each.
+  const merge = p.get("merge") === "1";
+  const rows = merge ? await sql`
+    WITH base AS (
+    SELECT e.event_id, 1 AS n, e.event_start, e.scientific_name, e.vernacular_name, e.confidence,
+           e.latitude, e.longitude, e.source_system, e.deployment_id, e.media_url, e.media_type, e.review_status,
+           CASE WHEN e.media_type IN ('image', 'video') AND e.source_system NOT IN ('inaturalist') THEN 'camera'
+                WHEN g.grp = 'bat' OR e.classifier_name ILIKE '%bat%' THEN 'bat' WHEN g.grp = 'avian' THEN 'Aves' WHEN g.grp = 'amphibian' THEN 'Amphibia' WHEN g.grp = 'insect' THEN 'Insecta' WHEN g.grp = 'mammal' THEN 'Mammalia'
+                ELSE COALESCE(NULLIF(m.iconic, 'Unknown'), CASE WHEN e.source_system = 'birdweather' THEN 'Aves' END, 'Unknown') END AS grp
+    FROM events e LEFT JOIN species_media m ON m.scientific_name = e.scientific_name
+    LEFT JOIN species_group g ON g.scientific_name = e.scientific_name
+    WHERE event_start >= ${from} AND event_start <= ${to}
+      AND confidence >= ${minConf}
+      AND review_status <> 'rejected'
+      ${species ? sql`AND e.scientific_name = ${species}` : sql``}
+      ${source ? sql`AND source_system = ${source}` : sql``}
+      ${group ? sql`AND g.grp = ${group}` : sql``}
+      ${hasBbox ? sql`AND geom && ST_MakeEnvelope(${bbox![0]}, ${bbox![1]}, ${bbox![2]}, ${bbox![3]}, 4326)::geography` : sql``}
+    )
+    SELECT * FROM (
+      SELECT * FROM base WHERE source_system <> 'birdweather'
+      UNION ALL
+      SELECT NULL AS event_id, count(*)::int AS n, max(event_start), scientific_name, max(vernacular_name), max(confidence),
+             latitude, longitude, 'birdweather', NULL, NULL, NULL, 'unreviewed', max(grp)
+      FROM base WHERE source_system = 'birdweather'
+      GROUP BY latitude, longitude, scientific_name, floor(extract(epoch FROM event_start) / 900)
+    ) x
+    ORDER BY event_start DESC
+    LIMIT ${limit}
+  ` : await sql`
+    SELECT e.event_id, 1 AS n, e.event_start, e.scientific_name, e.vernacular_name, e.confidence,
            e.latitude, e.longitude, e.source_system, e.deployment_id, e.media_url, e.media_type, e.review_status,
            CASE WHEN e.media_type IN ('image', 'video') AND e.source_system NOT IN ('inaturalist') THEN 'camera'
                 WHEN g.grp = 'bat' OR e.classifier_name ILIKE '%bat%' THEN 'bat' WHEN g.grp = 'avian' THEN 'Aves' WHEN g.grp = 'amphibian' THEN 'Amphibia' WHEN g.grp = 'insect' THEN 'Insecta' WHEN g.grp = 'mammal' THEN 'Mammalia'
@@ -83,6 +113,7 @@ export async function GET(req: Request) {
       // Empty fields are left out: the map fetches up to 20,000 of these every few minutes.
       properties: Object.fromEntries(Object.entries({
         id: r.event_id,
+        n: r.n > 1 ? r.n : null,
         t: r.event_start,
         sci: r.scientific_name,
         common: r.vernacular_name,
