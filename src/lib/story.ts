@@ -143,7 +143,7 @@ export function speciesStory(name: string, daily: DayPoint[], climate: Climate |
   return out;
 }
 
-interface DriftRow { vernacularName: string | null; scientificName: string; group: string; region: string; driftDeg: number }
+interface DriftRow { vernacularName: string | null; scientificName: string; group: string; region: string; driftDeg: number; driftLow?: number | null; driftHigh?: number | null }
 interface MoverRow { vernacularName: string | null; scientificName: string; group: string; ratio: number }
 const CLASS_PLURAL: Record<string, string> = { avian: "birds", bat: "bats", amphibian: "frogs and toads", insect: "insects", mammal: "mammals" };
 
@@ -153,7 +153,13 @@ export function overview(drift: DriftRow[], movers: MoverRow[]): string[] {
   const byRegion = new Map<string, DriftRow[]>();
   drift.forEach((d) => byRegion.set(d.region, [...(byRegion.get(d.region) ?? []), d]));
   for (const [region, rows] of [...byRegion.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 2)) {
-    if (rows.length < 3) continue;
+    if (rows.length < 3) {
+      // One or two clear movers: name the fastest, with its interval, rather than a count.
+      const lead = [...rows].sort((a, b) => Math.abs(b.driftDeg) - Math.abs(a.driftDeg))[0];
+      const ci = lead.driftLow != null && lead.driftHigh != null ? ` (95% interval ${round(Math.min(Math.abs(lead.driftLow), Math.abs(lead.driftHigh)))} to ${round(Math.max(Math.abs(lead.driftLow), Math.abs(lead.driftHigh)))}°)` : "";
+      out.push(`In ${region}, ${lead.vernacularName ?? lead.scientificName} is the clearest mover this week: its range centre shifted about ${round(Math.abs(lead.driftDeg))}° ${lead.driftDeg < 0 ? "south" : "north"}${ci}.`);
+      continue;
+    }
     const south = rows.filter((r) => r.driftDeg < 0).length;
     const dir = south >= rows.length / 2 ? "south" : "north";
     const k = dir === "south" ? south : rows.length - south;
