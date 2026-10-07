@@ -35,7 +35,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 BATCH = 500
 
 
@@ -145,7 +145,39 @@ def read_birdnet_pi(s: Settings, cursor):
 
 
 def read_birdnet_go(s: Settings, cursor):
+    """BirdNET-Go. Older versions keep a `notes` table (cursor = note id). Current versions keep `detections` joined to
+    `labels` and `ai_models` (cursor = {"d": detection id}); migrated rows keep their note id as legacy_id, so their
+    eventIds match what was sent before the upgrade and the server deduplicates them."""
     db = sqlite3.connect(f"file:{s.path}?mode=ro", uri=True, timeout=10)
+    tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if "detections" in tables and "labels" in tables:
+        start = cursor.get("d", 0) if isinstance(cursor, dict) else 0
+        rows = db.execute(
+            "SELECT d.id, d.legacy_id, d.detected_at, l.scientific_name, d.confidence, d.latitude, d.longitude, d.clip_name, "
+            "m.name, m.version, COALESCE(d.unlikely, 0), " + ("lt.name" if "label_types" in tables else "'species'") +
+            " FROM detections d JOIN labels l ON l.id = d.label_id LEFT JOIN ai_models m ON m.id = d.model_id " +
+            ("LEFT JOIN label_types lt ON lt.id = l.label_type_id " if "label_types" in tables else "") +
+            "WHERE d.id > ? ORDER BY d.id LIMIT ?",
+            (int(start), BATCH),
+        ).fetchall()
+        db.close()
+        for rid, legacy, at, sci, conf, lat, lon, clip, model, version, unlikely, kind in rows:
+            # Rows below the confidence threshold, flagged unlikely for the location, or not a species (noise, human, ...) still move the cursor.
+            if conf < s.min_confidence or unlikely or (kind or "species") != "species":
+                yield {"d": rid}, None
+                continue
+            dep = deployment(s, lat, lon, "acoustic-recorder", "BirdNET-Go")
+            if dep is None:
+                sys.exit("no coordinates: set latitude/longitude in the config")
+            record = str(legacy) if legacy else f"d{rid}"
+            when = datetime.fromtimestamp(int(at), tz=timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+            ev = base_event(s, f"{s.source}:{s.station_id}:{record}", when, dep, record)
+            ev["detection"] = {"scientificName": sci, "taxonRank": "species", "confidence": float(conf),
+                               "classifier": {"name": model or "BirdNET", "version": version or "unknown"}}
+            if clip:
+                ev["media"] = {"mediaType": "audio", "fileName": os.path.basename(clip)}
+            yield {"d": rid}, ev
+        return
     rows = db.execute(
         "SELECT id, date, time, scientific_name, common_name, confidence, latitude, longitude, clip_name FROM notes "
         "WHERE id > ? AND confidence >= ? ORDER BY id LIMIT ?",

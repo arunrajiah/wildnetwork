@@ -61,7 +61,7 @@ export default function Contribute() {
         <CopyBlock>{`curl -fsSL ${SITE}/agent/install.sh | bash`}</CopyBlock>
         <p>If it cannot find the database, tell it where <code className="text-slate-200">birdnet.db</code> is:</p>
         <CopyBlock>{`curl -fsSL ${SITE}/agent/install.sh | WDX_SOURCE=birdnet-go WDX_PATH=/path/to/birdnet.db bash`}</CopyBlock>
-        <p className="text-sm text-slate-400">Works with BirdNET-Go&apos;s original database layout. Its newer v2 datastore is not supported yet.</p>
+        <p className="text-sm text-slate-400">Works with both BirdNET-Go database layouts, the current one and the original one. Detections BirdNET-Go marks as unlikely for your location are skipped.</p>
 
         <H3 id="camera">Camera trap</H3>
         <p>
