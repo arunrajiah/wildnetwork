@@ -65,7 +65,7 @@
           { "name": "lon", "in": "query", "schema": { "type": "number" } },
           { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
         ],
-        "responses": { "200": { "description": "arrivals[]" } }
+        "responses": { "200": { "description": "arrivals[]: scientificName, cell, arrivalWeek, arrivalLow and arrivalHigh (90% interval), arrivalSupport (0 to 1: share of resampled series that still show a season; below 0.5 is weak), peakWeek, departureWeek and counts" } }
       }
     },
     "/api/v1/insights": { "get": { "summary": "What is changing now: moving, surging and fading, new and latest arrivals, most recorded, text summary", "parameters": [{ "name": "group", "in": "query", "schema": { "$ref": "#/components/schemas/Group" } }], "responses": { "200": { "description": "insights" } } } },
