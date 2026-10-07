@@ -39,6 +39,8 @@ const HOURS = [1, 3]; // the live window; longer history is in the weekly moveme
 // Validated for the dark surface (dataviz validator): sources are categorical, change is diverging.
 const SOURCE_COLOR: unknown[] = ["match", ["get", "source"], "birdweather", "#0891b2", "inaturalist", "#65a30d", "gbif", "#f59e0b", "#db2777"];
 
+const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
 export default function WorldMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
@@ -133,10 +135,11 @@ export default function WorldMap() {
         const f = e.features?.[0];
         if (!f) return;
         const p = f.properties as Record<string, string>;
-        const media = p.media
-          ? p.mediaType === "audio" ? `<audio controls src="${p.media}" style="width:220px;margin-top:6px"></audio>` : `<img src="${p.media}" style="width:220px;margin-top:6px;border-radius:6px" alt="" />`
+        // Names, links and credits come from pushed or third-party data, so everything is escaped before it reaches setHTML.
+        const media = p.media && /^https:\/\//.test(p.media)
+          ? p.mediaType === "audio" ? `<audio controls src="${esc(p.media)}" style="width:220px;margin-top:6px"></audio>` : `<img src="${esc(p.media)}" style="width:220px;margin-top:6px;border-radius:6px" alt="" />`
           : "";
-        const text = `<b>${p.common ?? p.sci}</b><br/><i>${p.sci ?? ""}</i><br/>${new Date(p.t).toLocaleString()}<br/>confidence ${Number(p.conf).toFixed(2)} · ${p.source}`;
+        const text = `<b>${esc(p.common ?? p.sci)}</b><br/><i>${esc(p.sci)}</i><br/>${new Date(p.t).toLocaleString()}<br/>confidence ${Number(p.conf).toFixed(2)} · ${esc(p.source)}`;
         const popup = new Popup({ closeButton: false, maxWidth: "260px" })
           .setLngLat((f.geometry as GeoJSON.Point).coordinates as [number, number])
           .setHTML(`<div style="font:13px system-ui;color:#e2e8f0">${text}${media}</div>`)
@@ -145,8 +148,8 @@ export default function WorldMap() {
         if (!p.media && p.sci) {
           fetch(`/api/v1/media?names=${encodeURIComponent(p.sci)}`).then((r) => r.json()).then((m: Record<string, { thumbUrl: string | null; attribution: string | null }>) => {
             const t = m[p.sci];
-            if (!t?.thumbUrl || !popup.isOpen()) return;
-            popup.setHTML(`<div style="font:13px system-ui;color:#e2e8f0">${text}<img src="${t.thumbUrl}" style="width:220px;margin-top:6px;border-radius:6px" alt="" /><div style="font-size:10px;color:#94a3b8;margin-top:2px">${t.attribution ?? ""}</div></div>`);
+            if (!t?.thumbUrl || !/^https:\/\//.test(t.thumbUrl) || !popup.isOpen()) return;
+            popup.setHTML(`<div style="font:13px system-ui;color:#e2e8f0">${text}<img src="${esc(t.thumbUrl)}" style="width:220px;margin-top:6px;border-radius:6px" alt="" /><div style="font-size:10px;color:#94a3b8;margin-top:2px">${esc(t.attribution)}</div></div>`);
           }).catch(() => {});
         }
       };

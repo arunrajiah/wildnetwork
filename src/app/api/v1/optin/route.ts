@@ -4,7 +4,7 @@ import { encryptToken, verifyToken, withdraw } from "@/lib/optin";
 
 const LICENSES = ["CC-BY-4.0", "CC0-1.0"];
 const PRECISIONS = [1, 10, 50];
-const PER_IP_PER_DAY = 10;
+const PER_IP_PER_DAY = 20;
 
 /**
  * BirdWeather station opt-in. Body: { action: "join" | "withdraw", token, displayName?, license?, precisionKm?, inReleases?, contact?, consent }.
@@ -18,8 +18,11 @@ export async function POST(req: Request) {
 
   const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
   const ipHash = hashIp("optin", ip);
-  const [{ n }] = await sql<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM bw_optin WHERE created_ip_hash = ${ipHash} AND created_at > now() - interval '1 day'`;
+  // Every attempt counts, failed tokens included, so the form cannot be used to test tokens against BirdWeather.
+  await sql`DELETE FROM optin_attempts WHERE at < now() - interval '1 day'`;
+  const [{ n }] = await sql<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM optin_attempts WHERE ip_hash = ${ipHash}`;
   if (n >= PER_IP_PER_DAY) return Response.json({ error: "Too many requests today. Please email arunrajiah@gmail.com." }, { status: 429 });
+  await sql`INSERT INTO optin_attempts (ip_hash) VALUES (${ipHash})`;
 
   let station;
   try { station = await verifyToken(token); } catch (e) {

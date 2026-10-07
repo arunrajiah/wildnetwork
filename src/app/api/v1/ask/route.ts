@@ -43,22 +43,24 @@ export async function POST(req: Request) {
 
   const [{ mine, today }] = await sql<{ mine: number; today: number }[]>`
     SELECT COUNT(*) FILTER (WHERE ip_hash = ${ipHash} AND created_at > now() - interval '1 hour')::int AS mine,
-           COUNT(*) FILTER (WHERE created_at > now() - interval '1 day' AND answer IS NOT NULL)::int AS today
+           COUNT(*) FILTER (WHERE created_at > now() - interval '1 day' AND error IS NULL)::int AS today
     FROM ask_log WHERE created_at > now() - interval '1 day'`;
   if (mine >= PER_IP_PER_HOUR) return Response.json({ error: "You have asked several questions in the last hour. Please try again a little later." }, { status: 429 });
   if (today >= PER_DAY_TOTAL) return Response.json({ error: "The question box has reached its limit for today. Please come back tomorrow." }, { status: 429 });
 
   const t0 = Date.now();
+  // The row is written before the model is called, so parallel requests count against the limits straight away.
+  const [{ id }] = await sql<{ id: string }[]>`INSERT INTO ask_log (ip_hash, question, q_norm) VALUES (${ipHash}, ${question}, ${qNorm}) RETURNING id`;
   try {
     const r = await answerQuestion(question, new URL(req.url).origin);
     await sql`
-      INSERT INTO ask_log (ip_hash, question, q_norm, answer, species, tools, model, tokens, ms)
-      VALUES (${ipHash}, ${question}, ${qNorm}, ${r.answer}, ${sql.json(r.species)}, ${sql.json(r.tools)}, ${r.model}, ${r.tokens}, ${Date.now() - t0})`;
+      UPDATE ask_log SET answer = ${r.answer}, species = ${sql.json(r.species)}, tools = ${sql.json(r.tools)}, model = ${r.model}, tokens = ${r.tokens}, ms = ${Date.now() - t0}
+      WHERE id = ${id}`;
     await sql`DELETE FROM ask_log WHERE created_at < now() - interval '30 days'`;
     return Response.json({ answer: r.answer, species: r.species, tools: r.tools, cached: false });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    await sql`INSERT INTO ask_log (ip_hash, question, q_norm, error, ms) VALUES (${ipHash}, ${question}, ${qNorm}, ${msg.slice(0, 500)}, ${Date.now() - t0})`;
+    await sql`UPDATE ask_log SET error = ${msg.slice(0, 500)}, ms = ${Date.now() - t0} WHERE id = ${id}`;
     // A free tier that has run out for the day fails here; say so plainly instead of inviting retries.
     if (/quota|rate.?limit|429|resource.?exhausted/i.test(msg)) {
       return Response.json({ error: "The question box has used up its free allowance for now. Please try again later." }, { status: 429 });

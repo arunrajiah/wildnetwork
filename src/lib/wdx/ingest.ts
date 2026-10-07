@@ -85,7 +85,8 @@ export async function ingestEvents(events: WdxEvent[], opts: { keepRaw?: boolean
         media_url = COALESCE(EXCLUDED.media_url, events.media_url),
         raw = EXCLUDED.raw,
         received_at = now()
-      WHERE COALESCE(EXCLUDED.raw->'review'->>'reviewedAt', '') >= COALESCE(events.raw->'review'->>'reviewedAt', '')
+      WHERE events.source_system = EXCLUDED.source_system
+        AND COALESCE(EXCLUDED.raw->'review'->>'reviewedAt', '') >= COALESCE(events.raw->'review'->>'reviewedAt', '')
       RETURNING (xmax = 0) AS inserted
     `;
     for (const r of res) if (r.inserted) inserted++; else updated++;

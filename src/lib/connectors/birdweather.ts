@@ -45,9 +45,9 @@ function toWdx(n: Node): WdxEvent | null {
     eventStart: n.timestamp,
     deployment: {
       deploymentId: n.station.id,
-      name: n.station.name,
-      latitude: c.lat,
-      longitude: c.lon,
+      // Station owners can hide their location: only a 1 degree position and no station name ever leave BirdWeather.
+      latitude: Math.round(c.lat),
+      longitude: Math.round(c.lon),
       coordinateUncertaintyMeters: n.station.locationPrivacyRadius || undefined,
       sensorType: "acoustic-recorder",
       sensorModel: n.station.type ?? undefined,

@@ -46,6 +46,9 @@ export async function getSpeciesMedia(name: string): Promise<SpeciesMedia> {
   const [cached] = await sql<Record<string, string | null>[]>`
     SELECT * FROM species_media WHERE scientific_name = ${name} AND iconic IS NOT NULL AND (source <> 'none' OR fetched_at > now() - interval '30 days')`;
   if (cached) return rowToMedia(cached);
+  // Only names that occur in the data are looked up and stored, so made-up names cannot fill the table or trigger outside fetches.
+  const [known] = await sql`SELECT 1 FROM species_group WHERE scientific_name = ${name} UNION ALL SELECT 1 FROM events WHERE scientific_name = ${name} LIMIT 1`;
+  if (!known) return rowToMedia({ scientific_name: name, source: "none" });
   const [wiki, inat] = await Promise.all([fromWikipedia(name).catch(() => null), fromInat(name).catch(() => ({ iconic: null, media: null }))]);
   const m = wiki?.thumbUrl ? wiki : (inat.media ?? wiki);
   const row = { iconic: inat.iconic ?? "Unknown", scientific_name: name, title: m?.title ?? null, thumb_url: m?.thumbUrl ?? null, image_url: m?.imageUrl ?? null, extract: m?.extract ?? null, page_url: m?.pageUrl ?? null, source: m?.source ?? "none", attribution: m?.attribution ?? null, license: m?.license ?? null };

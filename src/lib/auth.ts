@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { sql } from "@/lib/db";
 
 export function hashKey(raw: string): string {
@@ -36,4 +36,13 @@ export async function authenticate(req: Request): Promise<ApiKeyInfo | null> {
 export function hashIp(scope: string, ip: string): string {
   const salt = process.env.IP_SALT ?? process.env.CRON_SECRET ?? "";
   return createHash("sha256").update(`${scope}:${salt}:${ip}`).digest("hex");
+}
+
+/** Cron routes: closed when CRON_SECRET is unset, constant-time comparison otherwise. */
+export function cronAuthorized(req: Request): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  const a = Buffer.from(req.headers.get("authorization") ?? "");
+  const b = Buffer.from(`Bearer ${secret}`);
+  return a.length === b.length && timingSafeEqual(a, b);
 }

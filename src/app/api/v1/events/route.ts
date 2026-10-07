@@ -11,6 +11,7 @@ export async function POST(req: Request) {
   const key = await authenticate(req);
   if (!key) return Response.json({ error: "unauthorized" }, { status: 401 });
 
+  if (Number(req.headers.get("content-length") ?? 0) > 10_000_000) return Response.json({ error: "body larger than 10 MB" }, { status: 413 });
   let items: unknown[];
   try {
     items = parseEventsBody(await req.text());
@@ -43,14 +44,15 @@ export async function POST(req: Request) {
  */
 export async function GET(req: Request) {
   const p = new URL(req.url).searchParams;
-  const limit = Math.min(Number(p.get("limit") ?? 5000), 20000);
+  const limit = Math.max(1, Math.min(Math.trunc(Number(p.get("limit") ?? 5000)) || 5000, 20000));
   // Round the window start to the minute so identical requests share one CDN cache entry.
   const to = p.get("to") ? new Date(p.get("to")!) : new Date();
   const from = p.get("from") ? new Date(p.get("from")!) : new Date(to.getTime() - 24 * 3600 * 1000);
   const species = p.get("species");
   const source = p.get("source");
   const group = p.get("group");
-  const minConf = Number(p.get("minConfidence") ?? 0);
+  const minConf = Number(p.get("minConfidence") ?? 0) || 0;
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return Response.json({ error: "from and to must be ISO dates" }, { status: 400 });
   const bbox = p.get("bbox")?.split(",").map(Number);
   const hasBbox = bbox?.length === 4 && bbox.every((n) => Number.isFinite(n));
 
@@ -77,7 +79,7 @@ export async function GET(req: Request) {
     type: "FeatureCollection",
     features: rows.map((r) => ({
       type: "Feature",
-      geometry: { type: "Point", coordinates: [r.longitude, r.latitude] },
+      geometry: { type: "Point", coordinates: r.source_system === "birdweather" ? [Math.round(r.longitude), Math.round(r.latitude)] : [r.longitude, r.latitude] },
       properties: {
         id: r.event_id,
         t: r.event_start,
