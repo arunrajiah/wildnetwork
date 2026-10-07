@@ -3,6 +3,8 @@
 // Usage: tsx --env-file=.env.production.local scripts/release.mts   -> release/wildnetwork-open-<date>/ and a .zip
 import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
+const COMMIT = execSync("git rev-parse --short HEAD").toString().trim();
+const RELEASE_NO = process.argv[2] ?? "1";
 import { sql } from "../src/lib/db";
 import { CLASS_TAXA, baseParams, gbifJson } from "../src/lib/gbif";
 import { METHODS_VERSION, OBSERVED } from "../src/lib/methods";
@@ -28,9 +30,14 @@ const [range] = await sql<{ first: string; last: string }[]>`
   SELECT MIN(week)::text AS first, MAX(week)::text AS last FROM species_weekly
   WHERE source_system = 'gbif' AND week >= CURRENT_DATE - 371 AND week <= CURRENT_DATE - 14`;
 
-const weekly = await csv("weekly_records.csv", ["week", "cell_lat", "cell_lon", "class", "scientific_name", "vernacular_name", "records"],
-  sql`SELECT s.week::text AS week, s.cell_lat, s.cell_lon, COALESCE(g.grp, 'other') AS class, s.scientific_name, s.vernacular_name, s.count AS records
+// GBIF backbone species key for every name, so rows join reliably to other datasets (names differ between taxonomies).
+// A few names map to two keys (synonyms merged in the weekly rollup); the lowest key is used.
+const keys = new Map((await sql<{ scientific_name: string; key: number }[]>`SELECT scientific_name, MIN(species_key)::int AS key FROM gbif_taxa GROUP BY 1`).map((r) => [r.scientific_name, r.key]));
+
+const weekly = await csv("weekly_records.csv", ["week", "cell_lat", "cell_lon", "class", "scientific_name", "gbif_species_key", "vernacular_name", "records"],
+  sql`SELECT s.week::text AS week, s.cell_lat, s.cell_lon, COALESCE(g.grp, 'other') AS class, s.scientific_name, t.key AS gbif_species_key, s.vernacular_name, s.count AS records
       FROM species_weekly s LEFT JOIN species_group g USING (scientific_name)
+      LEFT JOIN (SELECT scientific_name, MIN(species_key)::int AS key FROM gbif_taxa GROUP BY 1) t USING (scientific_name)
       WHERE s.source_system = 'gbif' AND s.week >= ${range.first} AND s.week <= ${range.last}
       ORDER BY s.week, s.cell_lat, s.cell_lon, s.scientific_name`.cursor(20000));
 
@@ -40,8 +47,16 @@ const effort = await csv("effort.csv", ["week", "cell_lat", "cell_lon", "class",
       ORDER BY week, cell_lat, cell_lon, grp`.cursor(20000));
 
 const seasons = (await computeSeasons("gbif")).rows;
-const arrivals = await csv("arrivals.csv", ["scientific_name", "vernacular_name", "cell_lat", "cell_lon", "arrival_week", "peak_week", "departure_week", "peak_per_1000", "records", "weeks_observed", "absent_weeks_before"],
-  [seasons.map((s) => ({ ...s, peak_per_1000: Math.round(Number(s.peak_index) * 100) / 100, records: s.total_n, absent_weeks_before: s.absent_weeks }))]);
+const arrivals = await csv("arrivals.csv", ["scientific_name", "gbif_species_key", "vernacular_name", "cell_lat", "cell_lon", "arrival_week", "peak_week", "departure_week", "peak_per_1000", "records", "weeks_observed", "absent_weeks_before"],
+  [seasons.map((s) => ({ ...s, gbif_species_key: keys.get(String(s.scientific_name)) ?? "", peak_per_1000: Math.round(Number(s.peak_index) * 100) / 100, records: s.total_n, absent_weeks_before: s.absent_weeks }))]);
+
+const taxa = await csv("taxa.csv", ["gbif_species_key", "scientific_name", "vernacular_name", "class", "records", "cells", "weeks"],
+  [await sql`SELECT t.key AS gbif_species_key, s.scientific_name, MIN(s.vernacular_name) AS vernacular_name, COALESCE(MIN(g.grp), 'other') AS class,
+                    SUM(s.count)::int AS records, COUNT(DISTINCT (s.cell_lat, s.cell_lon))::int AS cells, COUNT(DISTINCT s.week)::int AS weeks
+             FROM species_weekly s LEFT JOIN species_group g USING (scientific_name)
+             LEFT JOIN (SELECT scientific_name, MIN(species_key)::int AS key FROM gbif_taxa GROUP BY 1) t USING (scientific_name)
+             WHERE s.source_system = 'gbif' AND s.week >= ${range.first} AND s.week <= ${range.last}
+             GROUP BY 1, 2 ORDER BY 2`]);
 
 // Contributing GBIF datasets, for citation: one facet query over the same classes, licences and dates.
 const p = baseParams();
@@ -65,7 +80,7 @@ await Promise.all(Array.from({ length: 3 }, async () => {
 sets.sort((a, b) => Number(b.records_used) - Number(a.records_used));
 const datasets = await csv("datasets.csv", ["dataset_key", "title", "doi", "dataset_license", "records_used"], [sets]);
 
-const doc = `# WildNetwork open data release, ${today}
+const doc = `# WildNetwork open data release ${RELEASE_NO} (${today})
 
 Weekly records of birds, bats, amphibians and insects on a 5 degree grid, with observation effort and seasonal arrival dates, from openly licensed records published through GBIF.org. Made by WildNetwork (https://wildnetwork.arunrajiah.com), methods version ${METHODS_VERSION}.
 
@@ -85,6 +100,7 @@ Weeks covered: ${range.first} to ${range.last} (weeks start on Monday). Licence:
 | cell_lat, cell_lon | south-west corner of the 5 degree cell, in degrees |
 | class | avian, bat, amphibian, insect (bats are the order Chiroptera, reported separately from mammals) |
 | scientific_name | GBIF backbone canonical name of the species |
+| gbif_species_key | GBIF backbone species key (join on this, not on the name) |
 | vernacular_name | English name most checklists agree on, where one exists |
 | records | number of GBIF occurrence records of the species in that cell and week |
 
@@ -94,8 +110,20 @@ All records of a class in a cell and week, the denominator for effort correction
 ### arrivals.csv (${arrivals.toLocaleString("en-GB")} rows)
 Seasonal timing per species and cell, from this data alone. arrival_week is the first week the species reaches a tenth of its seasonal peak share after at least six weeks below it, in a cell watched in the weeks before. peak_per_1000 is the peak share per 1,000 records of its class. Full definition and known limits: https://wildnetwork.arunrajiah.com/methods
 
+### taxa.csv (${taxa.toLocaleString("en-GB")} rows)
+One row per species in this release: GBIF species key, name, English name, class, total records, cells and weeks with records.
+
+To join other data (for example BirdNET or eBird names, which follow other taxonomies), match your names to GBIF keys with the GBIF species match service, https://api.gbif.org/v1/species/match?name=<name>, and join on gbif_species_key. Use the acceptedUsageKey where a name is a synonym.
+
 ### datasets.csv (${datasets.toLocaleString("en-GB")} rows)
 The GBIF datasets whose records fall in the classes and weeks above, with DOIs, the dataset's own licence, and how many of its records were used (only records individually licensed CC0 or CC BY 4.0 are used, even where the dataset as a whole carries a stricter licence such as CC BY-NC). Cite them as GBIF asks: https://www.gbif.org/citation-guidelines
+
+## How this release was made
+- Code: https://github.com/arunrajiah/wildnetwork at commit ${COMMIT}, script scripts/release.mts; methods version ${METHODS_VERSION} (definitions at https://wildnetwork.arunrajiah.com/methods).
+- Weekly counts: GBIF occurrence search API (https://api.gbif.org/v1/occurrence/search), one facet query per 5 degree cell and week, facet=speciesKey, with license=CC0_1_0 and CC_BY_4_0, hasCoordinate=true, hasGeospatialIssue=false, occurrenceStatus=PRESENT, basisOfRecord in HUMAN_OBSERVATION, MACHINE_OBSERVATION, OBSERVATION, OCCURRENCE, and taxonKey 212 (Aves), 734 (Chiroptera), 131 (Amphibia), 216 (Insecta). Cells queried: every 5 degree cell with at least 10 such bird records in the 90 days before the cell list was built.
+- Effort: the same counts summed over all species of a class per cell and week.
+- Arrivals: computed from these counts alone by computeSeasons("gbif") in src/lib/phenology.ts.
+- Records were accessed from GBIF between 3 and ${today.slice(8)} October ${today.slice(0, 4)}; GBIF data changes as publishers update, so a rebuild later will differ slightly.
 
 ## Limits
 Counts are records, not animals: they follow where and when people look and report. Coverage is uneven (strongest in northern and western Europe and North America); use effort.csv to judge it. GBIF receives records a week or two after they are made, so the most recent weeks are under-counted and are left out of this release.
@@ -113,7 +141,7 @@ authors:
     given-names: Arun
     email: arunrajiah@gmail.com
 date-released: ${today}
-version: "${today}"
+version: "${RELEASE_NO}"
 license: CC-BY-4.0
 url: "https://wildnetwork.arunrajiah.com/data"
 repository-code: "https://github.com/arunrajiah/wildnetwork"
