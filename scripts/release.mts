@@ -123,7 +123,7 @@ The GBIF datasets whose records fall in the classes and weeks above, with DOIs, 
 - Weekly counts: GBIF occurrence search API (https://api.gbif.org/v1/occurrence/search), one facet query per 5 degree cell and week, facet=speciesKey, with license=CC0_1_0 and CC_BY_4_0, hasCoordinate=true, hasGeospatialIssue=false, occurrenceStatus=PRESENT, basisOfRecord in HUMAN_OBSERVATION, MACHINE_OBSERVATION, OBSERVATION, OCCURRENCE, and taxonKey 212 (Aves), 734 (Chiroptera), 131 (Amphibia), 216 (Insecta). Cells queried: every 5 degree cell with at least 10 such bird records in the 90 days before the cell list was built.
 - Effort: the same counts summed over all species of a class per cell and week.
 - Arrivals: computed from these counts alone by computeSeasons("gbif") in src/lib/phenology.ts.
-- Records were accessed from GBIF between 3 and ${today.slice(8)} October ${today.slice(0, 4)}; GBIF data changes as publishers update, so a rebuild later will differ slightly.
+- Records were accessed from GBIF between 3 and ${Number(today.slice(8))} October ${today.slice(0, 4)}; GBIF data changes as publishers update, so a rebuild later will differ slightly.
 
 ## Limits
 Counts are records, not animals: they follow where and when people look and report. Coverage is uneven (strongest in northern and western Europe and North America); use effort.csv to judge it. GBIF receives records a week or two after they are made, so the most recent weeks are under-counted and are left out of this release.
