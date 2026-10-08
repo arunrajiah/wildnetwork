@@ -22,6 +22,18 @@ Notes:
 - The device key is shown once. Keep it in secure storage for devices the app manages (Base, phone-carried data); for others, the user copies it to their device.
 - Registration allows 5 devices per IP address per day. Show the server's error message if it is hit.
 
+## Findings from the end-to-end test of BirdEcho 0.11.2 (9 October 2026)
+
+Tested on the Android emulator against a real BirdNET-Go station and live WildNetwork. No crashes. Fix in the next release:
+
+1. **"Today" counts use the station's UTC day.** With three detections stamped 2:02 to 2:12 AM local on 9 October, the hero said "TODAY 0 detections" and Stats said "0 Today", because BirdNET-Go's `date` field was still 8 October UTC. Count by local date.
+2. **Near you rows leave the app with no warning.** Tapping a species in "Near you" opens the WildNetwork site in the browser; on a fresh phone that lands on Chrome's first-run screen. Either open an in-app species page, or mark the row with an external-link icon and open a custom tab.
+3. **Empty Near you reads as "no birds".** With Bangalore set it says "No arrivals or departures in your area in the last 4 weeks." Say also when no area is set, and when WildNetwork has no stations nearby yet, with a link to add one.
+4. **Station shown by raw URL twice** ("http://10.0.2.2:8080 / BirdNET-Go · http://10.0.2.2:8080"). Let the user name the station; the onboarding chooser above gives a natural place.
+5. **Build numbers:** the GitHub release asset for v0.11.2 is build 48, while Play has build 49. Build the release asset from the same commit as the Play submission, or note the difference in the release.
+
+What worked: connecting to BirdNET-Go, the feed and sighting detail, saving an area, Near you in Boston (four arrivals, all with arrival support 0.5 or more, Eurasian Curlew correctly absent), the "Moving in North America" list.
+
 ## Connecting to a Base
 
 Phase 0 uses Wi-Fi only; Bluetooth comes later. A Base runs its own hotspot:
