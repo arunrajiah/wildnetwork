@@ -36,8 +36,24 @@
     "/api/v1/register": {
       "post": {
         "summary": "Get a push key for a device (shown once, restricted to one source system; 5 per IP per day)",
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["name", "source"], "properties": { "name": { "type": "string" }, "source": { "type": "string", "enum": ["birdnet-pi", "birdnet-go", "birdecho", "speciesnet", "batdetect2", "megadetector", "wildecho-api", "speciesnet-studio", "animl", "frigate", "other"] }, "contact": { "type": "string" } } } } } },
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["name", "source"], "properties": { "name": { "type": "string" }, "source": { "type": "string", "enum": ["wildnetwork-base", "birdnet-pi", "birdnet-go", "birdecho", "speciesnet", "batdetect2", "megadetector", "wildecho-api", "speciesnet-studio", "animl", "frigate", "audiomoth", "other"] }, "contact": { "type": "string" } } } } } },
         "responses": { "200": { "description": "apiKey, source, endpoint" } }
+      }
+    },
+    "/api/v1/devices": {
+      "post": {
+        "summary": "Register a device (a WildNetwork Base or any recorder): returns deviceId and a push key, shown once. 5 per IP per day, shared with /register",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" }, "model": { "type": "string", "default": "wildnetwork-base" }, "source": { "type": "string", "description": "required unless model is wildnetwork-base" }, "hardwareId": { "type": "string" }, "contact": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "deviceId, apiKey, source, eventsEndpoint, statusEndpoint" } }
+      },
+      "get": { "summary": "Registered devices and their latest health report (no hardware ids, contacts or locations)", "responses": { "200": { "description": "devices[]" } } }
+    },
+    "/api/v1/devices/status": {
+      "post": {
+        "summary": "Send a health report (WDX device status, one record or an array). deviceId must be the key's device",
+        "security": [{ "bearer": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "https://raw.githubusercontent.com/arunrajiah/wildlife-detection-exchange/main/schema/device-status.schema.json" } } } },
+        "responses": { "200": { "description": "received, stored, rejected" }, "401": { "description": "missing or unknown key" }, "403": { "description": "not a device key" } }
       }
     },
     "/api/v1/deployments": { "get": { "summary": "Sensor locations as GeoJSON (BirdWeather stations rounded to 1 degree, without names)", "responses": { "200": { "description": "GeoJSON FeatureCollection" } } } },

@@ -1,8 +1,6 @@
 import { generateKey, hashKey, hashIp } from "@/lib/auth";
 import { sql } from "@/lib/db";
-
-const SOURCES = ["birdnet-pi", "birdnet-go", "birdecho", "speciesnet", "batdetect2", "megadetector", "wildecho-api", "speciesnet-studio", "animl", "frigate", "other"];
-const PER_IP_PER_DAY = 5;
+import { PER_IP_PER_DAY, SOURCES } from "@/lib/devices";
 
 /**
  * Self-serve device registration. Body: { name, source, contact? }.

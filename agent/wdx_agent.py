@@ -26,8 +26,10 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import socket
 import sqlite3
+import subprocess
 import sys
 import time
 import urllib.error
@@ -35,7 +37,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-VERSION = "0.2.1"
+VERSION = "0.3.0"
 BATCH = 500
 
 
@@ -80,6 +82,12 @@ class Settings:
         self.filename_timezone = a.get("filename_timezone", "utc").lower()
         self.min_calls = a.getint("min_calls", fallback=2)
         self.csv = {k[4:]: v for k, v in a.items() if k.startswith("csv_")}
+        # Device health (WDX device-status): sent when device_id is set, from the WildNetwork device registry.
+        self.device_id = a.get("device_id", "")
+        self.status_endpoint = a.get("status_endpoint", "") or self.endpoint.rsplit("/events", 1)[0] + "/devices/status"
+        self.status_interval = a.getint("status_interval_seconds", fallback=900)
+        # Optional command printing JSON such as {"percent": 81, "volts": 13.1, "charging": true} (hardware specific).
+        self.battery_command = a.get("battery_command", "")
 
 
 def default_station_id() -> str:
@@ -407,14 +415,33 @@ def post(s: Settings, events: list) -> dict:
         return json.loads(r.read())
 
 
-def run_once(s: Settings, dry: bool) -> int:
-    state = {}
+def state_key(s: Settings) -> str:
+    return f"{s.source}:{s.path}"
+
+
+def load_state(s: Settings) -> dict:
     try:
-        state = json.loads(Path(s.state_path).read_text())
+        return json.loads(Path(s.state_path).read_text())
     except (OSError, ValueError):
-        pass
-    key = f"{s.source}:{s.path}"
-    batch = list(SOURCES[s.source](s, state.get(key)))
+        return {}
+
+
+def save_cursor(s: Settings, cursor) -> None:
+    """Advance the source cursor. Also used by the WildNetwork Base after a phone has carried a batch out."""
+    state = load_state(s)
+    state[state_key(s)] = cursor
+    tmp = s.state_path + ".tmp"
+    Path(tmp).write_text(json.dumps(state))
+    os.replace(tmp, s.state_path)
+
+
+def pending_batch(s: Settings) -> list:
+    """Up to BATCH (cursor, event) pairs not yet sent; event is None for rows that are skipped but still move the cursor."""
+    return list(SOURCES[s.source](s, load_state(s).get(state_key(s))))
+
+
+def run_once(s: Settings, dry: bool) -> int:
+    batch = pending_batch(s)
     if not batch:
         return 0
     events = [e for _, e in batch if e is not None]  # None marks a row that was skipped but still moves the cursor
@@ -431,11 +458,49 @@ def run_once(s: Settings, dry: bool) -> int:
         log("server rejected the whole batch; not advancing (check api_key and source in the config)")
         return 0
     # The cursor only advances after the server accepted the batch, so an offline Pi just catches up later.
-    state[key] = batch[-1][0]
-    tmp = s.state_path + ".tmp"
-    Path(tmp).write_text(json.dumps(state))
-    os.replace(tmp, s.state_path)
+    save_cursor(s, batch[-1][0])
     return len(events)
+
+
+def collect_status(s: Settings) -> dict:
+    """WDX device-status record: what can be read on any Linux device, plus the battery if a command is configured."""
+    st = {"wdx": "0.2", "kind": "device-status", "deviceId": s.device_id or s.station_id,
+          "at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+          "software": {"wdx-agent": VERSION}}
+    try:
+        du = shutil.disk_usage(os.path.dirname(s.state_path) or "/")
+        st["storage"] = {"freeMb": du.free // 1_000_000, "totalMb": du.total // 1_000_000}
+    except OSError:
+        pass
+    try:
+        st["temperatureC"] = round(int(Path("/sys/class/thermal/thermal_zone0/temp").read_text()) / 1000, 1)
+    except (OSError, ValueError):
+        pass
+    try:
+        st["uptimeSeconds"] = int(float(Path("/proc/uptime").read_text().split()[0]))
+    except (OSError, ValueError, IndexError):
+        pass
+    if s.battery_command:
+        try:
+            out = subprocess.run(s.battery_command, shell=True, capture_output=True, text=True, timeout=10).stdout
+            b = json.loads(out)
+            st["battery"] = {k: b[k] for k in ("percent", "volts", "charging") if k in b}
+        except (OSError, ValueError, subprocess.SubprocessError):
+            pass
+    try:
+        # Rows waiting to be sent: a cheap upper bound from one batch read (BATCH means "at least this many").
+        st["queue"] = {"pending": sum(1 for _, e in pending_batch(s) if e is not None)}
+    except (OSError, sqlite3.Error, KeyError):
+        pass
+    return st
+
+
+def post_status(s: Settings) -> None:
+    body = json.dumps(collect_status(s), separators=(",", ":")).encode()
+    req = urllib.request.Request(s.status_endpoint, data=body, method="POST", headers={
+        "authorization": f"Bearer {s.api_key}", "content-type": "application/json", "user-agent": f"wdx-agent/{VERSION}"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        r.read()
 
 
 def main() -> None:
@@ -451,8 +516,15 @@ def main() -> None:
         sys.exit("api_key is empty: register at the endpoint or run install.sh")
     log(f"wdx-agent {VERSION} source={s.source} path={s.path} station={s.station_id} -> {s.endpoint}")
     backoff = s.interval
+    last_status = 0.0
     while True:
         try:
+            if s.device_id and not args.dry_run and time.time() - last_status >= s.status_interval:
+                last_status = time.time()
+                try:
+                    post_status(s)
+                except (urllib.error.URLError, TimeoutError) as e:
+                    log(f"status not sent: {e}")
             n = run_once(s, args.dry_run)
             backoff = s.interval
             if args.once or args.dry_run:

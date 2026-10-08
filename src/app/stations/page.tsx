@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 const LABEL: Record<string, string> = { birdweather: "BirdWeather stations", inaturalist: "iNaturalist observers", gbif: "GBIF datasets (live)" };
 
 export default async function Stations() {
-  const [bySource, direct, optins] = await Promise.all([
+  const [bySource, direct, optins, devices] = await Promise.all([
     sql<{ source_system: string; active: number; total: number }[]>`
       SELECT source_system, COUNT(*) FILTER (WHERE last_seen > now() - interval '7 days')::int AS active, COUNT(*)::int AS total
       FROM deployments GROUP BY 1 ORDER BY 2 DESC`,
@@ -28,6 +28,9 @@ export default async function Stations() {
              COUNT(DISTINCT d.scientific_name)::int AS species, COUNT(DISTINCT d.day)::int AS days
       FROM bw_optin o LEFT JOIN bw_optin_daily d USING (station_id)
       WHERE o.status = 'active' GROUP BY 1 ORDER BY o.created_at`.catch(() => []),
+    sql<{ id: string; name: string; model: string; last_status: { battery?: { percent?: number }; storage?: { freeMb?: number; totalMb?: number }; queue?: { pending?: number } } | null; last_status_at: string | null }[]>`
+      SELECT id, name, model, last_status, last_status_at::text FROM devices
+      WHERE last_status_at > now() - interval '30 days' ORDER BY last_status_at DESC LIMIT 200`.catch(() => []),
   ]);
   return (
     <main className="min-h-screen bg-slate-950 text-slate-300">
@@ -96,6 +99,34 @@ export default async function Stations() {
           </table>
         ) : (
           <p className="mt-4 rounded-lg border border-white/10 bg-white/5 p-4">No station sends directly yet. Yours could be the first.</p>
+        )}
+        <h2 className="mt-10 text-xl font-semibold text-slate-100">Device health</h2>
+        <p className="mt-2">
+          WildNetwork Bases and other registered devices report their battery, storage and backlog. Shown here: devices that reported in the last 30 days.
+          Health reports carry no detections and no location.
+        </p>
+        {devices.length ? (
+          <table className="mt-4 w-full text-sm">
+            <thead><tr className="text-left text-slate-400 border-b border-white/10"><th className="py-1.5 font-medium">Device</th><th className="font-medium">Type</th><th className="font-medium">Last report</th><th className="font-medium text-right">Battery</th><th className="font-medium text-right">Storage free</th><th className="font-medium text-right">Waiting to send</th></tr></thead>
+            <tbody>
+              {devices.map((d) => {
+                const st = d.last_status ?? {};
+                const free = st.storage?.freeMb != null && st.storage?.totalMb ? Math.round((100 * st.storage.freeMb) / st.storage.totalMb) : null;
+                return (
+                  <tr key={d.id} className="border-b border-white/5">
+                    <td className="py-1.5">{d.name}</td>
+                    <td>{d.model}</td>
+                    <td>{d.last_status_at ? new Date(d.last_status_at).toISOString().slice(0, 16).replace("T", " ") + " UTC" : ""}</td>
+                    <td className="text-right">{st.battery?.percent != null ? `${Math.round(st.battery.percent)}%` : ""}</td>
+                    <td className="text-right">{free != null ? `${free}%` : ""}</td>
+                    <td className="text-right">{st.queue?.pending != null ? st.queue.pending.toLocaleString("en-GB") : ""}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <p className="mt-4 rounded-lg border border-white/10 bg-white/5 p-4">No device has reported its health yet.</p>
         )}
         <p className="mt-6">
           <Link href="/contribute" className="inline-block rounded-md bg-cyan-500 px-4 py-2 font-medium text-slate-950 hover:bg-cyan-400">Add your station</Link>

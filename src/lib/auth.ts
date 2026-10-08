@@ -13,6 +13,7 @@ export interface ApiKeyInfo {
   id: number;
   name: string;
   sourceSystem: string | null;
+  deviceId: string | null;
 }
 
 /** Returns key info or null. Accepts "Authorization: Bearer <key>" or "X-Api-Key". */
@@ -20,13 +21,13 @@ export async function authenticate(req: Request): Promise<ApiKeyInfo | null> {
   const auth = req.headers.get("authorization");
   const raw = auth?.startsWith("Bearer ") ? auth.slice(7) : req.headers.get("x-api-key");
   if (!raw) return null;
-  const rows = await sql<{ id: number; name: string; source_system: string | null }[]>`
+  const rows = await sql<{ id: number; name: string; source_system: string | null; device_id: string | null }[]>`
     UPDATE api_keys SET last_used_at = now()
     WHERE key_hash = ${hashKey(raw)} AND revoked_at IS NULL
-    RETURNING id, name, source_system
+    RETURNING id, name, source_system, device_id
   `;
   const r = rows[0];
-  return r ? { id: r.id, name: r.name, sourceSystem: r.source_system } : null;
+  return r ? { id: r.id, name: r.name, sourceSystem: r.source_system, deviceId: r.device_id } : null;
 }
 
 /**

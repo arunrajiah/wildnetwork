@@ -36,7 +36,7 @@ const EMPTY: FC = { type: "FeatureCollection", features: [] };
 const STYLE = "https://tiles.openfreemap.org/styles/dark";
 const HOURS = [1, 3]; // the live window; longer history is in the weekly movement playback
 // Validated for the dark surface (dataviz validator): sources are categorical, change is diverging.
-const SOURCE_COLOR: unknown[] = ["match", ["get", "source"], "birdweather", "#0891b2", "inaturalist", "#65a30d", "gbif", "#f59e0b", "#db2777"];
+const SOURCE_COLOR: unknown[] = ["match", ["get", "source"], "birdweather", "#0891b2", "inaturalist", "#65a30d", "gbif", "#f59e0b", "wildnetwork-base", "#a78bfa", "#db2777"];
 
 const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
