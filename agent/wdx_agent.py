@@ -37,7 +37,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 BATCH = 500
 
 
@@ -490,8 +490,8 @@ def collect_status(s: Settings) -> dict:
     try:
         # Rows waiting to be sent: a cheap upper bound from one batch read (BATCH means "at least this many").
         st["queue"] = {"pending": sum(1 for _, e in pending_batch(s) if e is not None)}
-    except (OSError, sqlite3.Error, KeyError):
-        pass
+    except (OSError, sqlite3.Error, KeyError, SystemExit):
+        pass  # no source yet, or a source that needs coordinates before it can be read: report the rest
     return st
 
 
