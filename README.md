@@ -40,7 +40,7 @@ It is free, open source, and built so that anyone with a Raspberry Pi can contri
 
 The step by step guide, for people who already have a device and for people starting from nothing, is at **[wildnetwork.arunrajiah.com/contribute](https://wildnetwork.arunrajiah.com/contribute)**. Stations that already report to BirdWeather are included automatically and should not install the agent as well.
 
-Building a new station? The open **[WildNetwork Base](https://github.com/arunrajiah/wildnetwork-base)** (Raspberry Pi, microphone, solar) identifies birds on the device and sends to WildNetwork by itself; install it on a Raspberry Pi (a ready-to-flash SD card image is coming) and set it up from a phone or a browser.
+Building a new station? The open **[WildNetwork Base](https://github.com/arunrajiah/wildnetwork-base)** (Raspberry Pi, microphone, solar) identifies birds on the device and sends to WildNetwork by itself; flash its SD card image (beta) onto a Raspberry Pi and set it up from a phone or a browser.
 
 If you run BirdNET-Pi or BirdNET-Go on a Raspberry Pi:
 
@@ -207,7 +207,7 @@ Eight open source projects for listening to, identifying and mapping wildlife. T
 | I want to | Use | What it is |
 |---|---|---|
 | See where birds and wildlife are moving, or download the data | [WildNetwork](https://github.com/arunrajiah/wildnetwork) (this project) | The live map and open data: [wildnetwork.arunrajiah.com](https://wildnetwork.arunrajiah.com) |
-| Build a monitoring station from open hardware | [WildNetwork Base](https://github.com/arunrajiah/wildnetwork-base) | Software for the open WildNetwork station (Raspberry Pi, microphone, solar); SD card image coming |
+| Build a monitoring station from open hardware | [WildNetwork Base](https://github.com/arunrajiah/wildnetwork-base) | Software and a ready-to-flash SD card image (beta) for the open WildNetwork station (Raspberry Pi, microphone, solar) |
 | Share detections from a BirdNET-Pi, BirdNET-Go, camera trap or bat detector you already have | [wdx-agent](https://github.com/arunrajiah/wdx-agent) | One small program that sends your station's detections. BirdWeather stations are already included and need nothing |
 | Follow your own station on your phone | [BirdEcho](https://github.com/arunrajiah/birdecho) | Android app for BirdNET-Pi, BirdNET-Go and BirdWeather stations |
 | Identify a sound you just heard | [WildEcho](https://github.com/arunrajiah/wildecho) | Phone app: record a clip, get ranked species |
