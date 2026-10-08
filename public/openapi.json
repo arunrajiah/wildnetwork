@@ -27,7 +27,7 @@
         "responses": { "200": { "description": "GeoJSON FeatureCollection; properties: id, t, sci, common, conf, source, grp, media, mediaType" } }
       },
       "post": {
-        "summary": "Push WDX 0.1 detection events (single event, JSON array or NDJSON, up to 5,000 per request)",
+        "summary": "Push WDX 0.1 or 0.2 detection events (single event, JSON array or NDJSON, up to 5,000 per request)",
         "security": [{ "bearer": [] }],
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "https://raw.githubusercontent.com/arunrajiah/wildlife-detection-exchange/main/schema/detection-event.schema.json" } } } },
         "responses": { "200": { "description": "received, inserted, updated, rejected, rejectedDetails" }, "401": { "description": "missing or invalid key" }, "413": { "description": "more than 5,000 events" } }

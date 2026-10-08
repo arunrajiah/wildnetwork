@@ -2,13 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/arunrajiah/wildlife-detection-exchange/schema/detection-event.schema.json",
   "title": "WDX Detection Event",
-  "description": "A single machine-generated wildlife detection event. Wildlife Detection Exchange (WDX) v0.1.",
+  "description": "A single machine-generated wildlife detection event. Wildlife Detection Exchange (WDX) v0.2 draft; v0.1 events remain valid.",
   "type": "object",
   "required": ["wdx", "eventId", "eventStart", "deployment", "detection", "source"],
   "properties": {
     "wdx": {
       "type": "string",
-      "const": "0.1",
+      "enum": ["0.1", "0.2"],
       "description": "WDX spec version this event conforms to."
     },
     "eventId": {
@@ -66,7 +66,23 @@
           },
           "additionalProperties": true
         },
-        "classifiedAt": { "type": "string", "format": "date-time" }
+        "classifiedAt": { "type": "string", "format": "date-time" },
+        "pipeline": {
+          "type": "array",
+          "minItems": 1,
+          "description": "v0.2: ordered model steps that led to this detection, first step first. The step that produced the label is also given as `classifier`.",
+          "items": {
+            "type": "object",
+            "required": ["role", "name", "version"],
+            "properties": {
+              "role": { "type": "string", "minLength": 1, "description": "Free text. Suggested: detector, classifier, filter, tracker." },
+              "name": { "type": "string", "minLength": 1 },
+              "version": { "type": "string", "minLength": 1 },
+              "weights": { "type": "string", "minLength": 1, "description": "Optional identifier of the exact weights: file hash, model registry id or URL." }
+            },
+            "additionalProperties": true
+          }
+        }
       },
       "additionalProperties": true
     },
@@ -83,7 +99,31 @@
         "fileName": { "type": "string" },
         "startOffsetSeconds": { "type": "number", "minimum": 0 },
         "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
-        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "region": {
+          "type": "object",
+          "description": "v0.2: where the detected object is in an image or video frame. One region per event.",
+          "required": ["type", "coordinates"],
+          "properties": {
+            "type": { "type": "string", "enum": ["box", "polygon", "point"] },
+            "coordinates": {
+              "type": "array",
+              "description": "box: [x, y, width, height] from the top-left corner; polygon: [[x, y], ...] with at least 3 points; point: [x, y].",
+              "items": { "anyOf": [{ "type": "number" }, { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }] }
+            },
+            "units": { "type": "string", "enum": ["normalized", "pixels"], "default": "normalized", "description": "normalized: 0 to 1 of the image width and height, origin top left." },
+            "imageWidth": { "type": "integer", "exclusiveMinimum": 0 },
+            "imageHeight": { "type": "integer", "exclusiveMinimum": 0 },
+            "frame": { "type": "integer", "minimum": 0, "description": "Video only: frame index the region refers to. Alternatively use startOffsetSeconds." }
+          },
+          "allOf": [
+            { "if": { "properties": { "type": { "const": "box" } } }, "then": { "properties": { "coordinates": { "minItems": 4, "maxItems": 4, "items": { "type": "number" } } } } },
+            { "if": { "properties": { "type": { "const": "point" } } }, "then": { "properties": { "coordinates": { "minItems": 2, "maxItems": 2, "items": { "type": "number" } } } } },
+            { "if": { "properties": { "type": { "const": "polygon" } } }, "then": { "properties": { "coordinates": { "minItems": 3, "items": { "type": "array" } } } } },
+            { "if": { "properties": { "units": { "const": "pixels" } }, "required": ["units"] }, "then": { "required": ["imageWidth", "imageHeight"] } }
+          ],
+          "additionalProperties": true
+        }
       },
       "additionalProperties": true
     },
