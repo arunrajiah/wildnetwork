@@ -10,6 +10,7 @@ import AboutPanel from "./AboutPanel";
 import AskPanel from "./AskPanel";
 import { track } from "./Analytics";
 import SpeciesPanel, { type SpeciesDetail } from "./SpeciesPanel";
+import Tour, { TOUR_KEY } from "./Tour";
 
 
 type FC = GeoJSON.FeatureCollection<GeoJSON.Geometry, Record<string, unknown>>;
@@ -356,6 +357,22 @@ export default function WorldMap() {
     setEvents(EMPTY); setLoading(true);
   };
   const pick = (name: string) => { selectSpecies(name); setTab("now"); track("select_species", { species: name }); };
+
+  // First-visit walkthrough: opens once the map is ready, unless the visitor came for a species or has seen it. The About panel can replay it.
+  const [tour, setTour] = useState<"auto" | "manual" | null>(null);
+  useEffect(() => {
+    const replay = () => setTour("manual");
+    window.addEventListener("wn:tour", replay);
+    return () => window.removeEventListener("wn:tour", replay);
+  }, []);
+  useEffect(() => {
+    if (!ready) return;
+    let seen = true;
+    try { seen = localStorage.getItem(TOUR_KEY) === "done"; } catch {}
+    if (seen || new URLSearchParams(window.location.search).has("species")) return;
+    const t = setTimeout(() => setTour("auto"), 1500);
+    return () => clearTimeout(t);
+  }, [ready]);
   // Deep link from the species pages: /?species=Hirundo rustica
   useEffect(() => {
     const name = new URLSearchParams(window.location.search).get("species");
@@ -383,7 +400,7 @@ export default function WorldMap() {
           {status?.live ? "Live" : "Stale"}{status?.lastPullAt && <span className="hidden sm:inline"> · updated {relTime(status.lastPullAt)}</span>}
         </span>
         <div className="flex-1" />
-        <div className="hidden lg:flex items-center gap-1" role="group" aria-label="Animal class">
+        <div data-tour="classes" className="hidden lg:flex items-center gap-1" role="group" aria-label="Animal class">
           {CLASSES.map((c) => (
             <button key={c.key} onClick={() => { track("select_class", { class: c.key }); setGroup(c.key); selectSpecies(null); if (tab === null) setTab("now"); }}
               className={`text-xs rounded px-2 py-1 ${group === c.key ? "bg-white/90 text-slate-900 font-medium" : "text-slate-300 hover:bg-white/10"}`}>
@@ -391,11 +408,11 @@ export default function WorldMap() {
             </button>
           ))}
         </div>
-        <select value={group} onChange={(e) => { setGroup(e.target.value); selectSpecies(null); }} aria-label="Animal class"
+        <select data-tour="classes" value={group} onChange={(e) => { setGroup(e.target.value); selectSpecies(null); }} aria-label="Animal class"
           className="lg:hidden rounded-md bg-white/10 px-2 py-1 text-sm outline-none">
           {CLASSES.map((c) => <option key={c.key} value={c.key} className="text-slate-900">{c.label}</option>)}
         </select>
-        <div className="relative w-64 max-w-[40vw]">
+        <div data-tour="search" className="relative w-64 max-w-[40vw]">
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search a species"
             className="w-full rounded-md bg-white/10 px-2.5 py-1 text-sm outline-none focus:bg-white/15 placeholder:text-slate-500" />
           {query.trim().length >= 2 && (
@@ -417,12 +434,12 @@ export default function WorldMap() {
       </header>
 
       {/* Icon rail */}
-      <nav className="absolute left-0 top-11 bottom-0 w-[4.375rem] bg-black/80 backdrop-blur-xl border-r border-white/10 flex flex-col items-center py-2 gap-1 z-20">
+      <nav data-tour="rail" className="absolute left-0 top-11 bottom-0 w-[4.375rem] bg-black/80 backdrop-blur-xl border-r border-white/10 flex flex-col items-center py-2 gap-1 z-20">
         <RailButton label="Now" active={tab === "now" && !species} onClick={() => { setTab("now"); selectSpecies(null); }} icon={<path d="M3 12h4l3-8 4 16 3-8h4" />} />
         <RailButton label="Feed" active={tab === "feed" && !species} onClick={() => { setTab("feed"); selectSpecies(null); }} icon={<><path d="M4 6h16M4 12h16M4 18h10" /></>} />
         {status?.ask && <RailButton label="Ask" active={tab === "ask" && !species} onClick={() => { setTab("ask"); selectSpecies(null); }} icon={<><path d="M4 5h16v11H9l-5 4z" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.4M12 15.5h.01" /></>} />}
         <RailButton label="About" active={tab === "about" && !species} onClick={() => { setTab("about"); selectSpecies(null); }} icon={<><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></>} />
-        <Link href="/contribute" className="w-14 h-14 rounded-md flex flex-col items-center justify-center gap-1 text-[10px] text-slate-400 hover:bg-white/5 hover:text-slate-200">
+        <Link data-tour="contribute" href="/contribute" className="w-14 h-14 rounded-md flex flex-col items-center justify-center gap-1 text-[10px] text-slate-400 hover:bg-white/5 hover:text-slate-200">
           <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /><circle cx="12" cy="12" r="9" /></svg>
           Add data
         </Link>
@@ -562,7 +579,7 @@ export default function WorldMap() {
       </div>
 
       {/* Time slider */}
-      <div className={`absolute right-3 md:right-6 bottom-9 left-[5.25rem] ${panelOpen ? "max-md:hidden md:left-[30rem]" : "md:left-24"} h-[3.75rem] rounded-lg bg-black/70 backdrop-blur-xl border border-white/10 px-4 flex items-center gap-3 z-10 transition-[left]`}>
+      <div data-tour="slider" className={`absolute right-3 md:right-6 bottom-9 left-[5.25rem] ${panelOpen ? "max-md:hidden md:left-[30rem]" : "md:left-24"} h-[3.75rem] rounded-lg bg-black/70 backdrop-blur-xl border border-white/10 px-4 flex items-center gap-3 z-10 transition-[left]`}>
         {species ? (
           <>
             <span className="text-[11px] uppercase tracking-wider text-slate-400 shrink-0 whitespace-nowrap">{activeFrame ? new Date(activeFrame.week).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" }) : "Movement"}</span>
@@ -598,6 +615,8 @@ export default function WorldMap() {
           </>
         )}
       </div>
+
+      <Tour key={tour ?? "closed"} open={tour !== null} auto={tour === "auto"} askEnabled={!!status?.ask} onClose={() => setTour(null)} />
     </div>
   );
 }

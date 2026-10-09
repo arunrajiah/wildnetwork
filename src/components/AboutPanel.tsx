@@ -25,6 +25,9 @@ export default function AboutPanel() {
           WildNetwork is free and has no ads. Hosting and the open data releases cost money: if it is useful to you, you can{" "}
           <Link href="https://github.com/sponsors/arunrajiah">support it on GitHub Sponsors</Link>.
         </p>
+        <p className="mt-2">
+          New here? <button onClick={() => window.dispatchEvent(new Event("wn:tour"))} className="text-cyan-400 hover:underline">Take the one-minute tour</button>.
+        </p>
       </section>
 
       <section>
