@@ -21,6 +21,10 @@ export default function AboutPanel() {
           <Link href="https://github.com/arunrajiah/speciesnet-studio">SpeciesNet Studio</Link>. Source code:{" "}
           <Link href="https://github.com/arunrajiah/wildnetwork">github.com/arunrajiah/wildnetwork</Link>.
         </p>
+        <p className="mt-2">
+          WildNetwork is free and has no ads. Hosting and the open data releases cost money: if it is useful to you, you can{" "}
+          <Link href="https://github.com/sponsors/arunrajiah">support it on GitHub Sponsors</Link>.
+        </p>
       </section>
 
       <section>

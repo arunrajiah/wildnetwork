@@ -327,6 +327,7 @@ export default function Methods() {
         <p className="mt-10 text-sm text-slate-500">
           Made by <a href="https://www.arunrajiah.com" className="text-cyan-400 hover:underline">Arun Rajiah</a>. Code and this page are open:{" "}
           <a href="https://github.com/arunrajiah/wildnetwork" className="text-cyan-400 hover:underline">github.com/arunrajiah/wildnetwork</a>.
+          Free, no ads; you can <a href="https://github.com/sponsors/arunrajiah" className="text-cyan-400 hover:underline">support it on GitHub Sponsors</a>.
         </p>
       </div>
     </main>
