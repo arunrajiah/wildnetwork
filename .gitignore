@@ -58,3 +58,7 @@ docs/OUTREACH.md
 
 # assistant tooling installed locally by the Neon CLI, not part of the project
 .agents/
+
+# Local AI assistant / OS / env files
+CLAUDE.local.md
+.mcp.json
