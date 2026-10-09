@@ -55,3 +55,6 @@ docs/NEON-APPLICATION.md
 docs/AI-CREDITS.md
 release/
 docs/OUTREACH.md
+
+# assistant tooling installed locally by the Neon CLI, not part of the project
+.agents/
