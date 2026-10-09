@@ -1,0 +1,54 @@
+name: Uptime
+# Second, independent watcher next to cron-job.org: checks the health endpoints and keeps one "outage" issue
+# open while anything is down, so GitHub emails the owner. GitHub runs schedules late, often by hours.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the services
+        id: check
+        run: |
+          fail=""
+          check() {
+            code=$(curl -s -o body.txt -w '%{http_code}' --max-time 30 "$2" || echo 000)
+            echo "$1: HTTP $code"
+            if [ "$code" != "200" ]; then fail="$fail\n- $1: HTTP $code at $2 ($(head -c 300 body.txt | tr '\n' ' '))"; fi
+          }
+          check "WildNetwork health" "https://wildnetwork.arunrajiah.com/api/v1/health"
+          check "WildNetwork home" "https://wildnetwork.arunrajiah.com/"
+          check "wildecho-api health" "https://wildecho.arunrajiah.com/v1/health"
+          if [ -n "$fail" ]; then
+            printf 'failures<<EOF\n%b\nEOF\n' "$fail" >> "$GITHUB_OUTPUT"
+            echo "down=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "down=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Open or update the outage issue
+        if: steps.check.outputs.down == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FAILURES: ${{ steps.check.outputs.failures }}
+        run: |
+          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --label outage --state open --json number --jq '.[0].number')
+          body="Checked $(date -u +'%Y-%m-%d %H:%M UTC'):${FAILURES}"
+          if [ -z "$n" ]; then
+            gh label create outage --repo "$GITHUB_REPOSITORY" --color d73a4a --description "A service is down" 2>/dev/null || true
+            gh issue create --repo "$GITHUB_REPOSITORY" --label outage --title "Outage: a service is not responding" --body "$body"
+          else
+            gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body "$body"
+          fi
+      - name: Close the outage issue when everything is back
+        if: steps.check.outputs.down == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --label outage --state open --json number --jq '.[0].number')
+          [ -n "$n" ] && gh issue close "$n" --repo "$GITHUB_REPOSITORY" --comment "All services responded at $(date -u +'%Y-%m-%d %H:%M UTC')." || true
